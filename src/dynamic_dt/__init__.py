@@ -833,6 +833,7 @@ class DynamicDT:
 			"decades": ("dc", "decade", "decades"),
 			"years": ("y", "yr", "year", "years"),
 			"months": ("mo", "mth", "mos", "mths", "month", "months"),
+			"fortnights": ("fortnight", "fortnights"),
 			"weeks": ("w", "wk", "week", "wks", "weeks"),
 			"days": ("d", "day", "days"),
 			"hours": ("h", "hr", "hour", "hrs", "hours"),
@@ -849,6 +850,13 @@ class DynamicDT:
 			"rontoseconds": ("rs", "ronto", "rontosecond", "rontos", "rontoseconds"),
 			"quectoseconds": ("qs", "quecto", "quectosecond", "quectos", "quectoseconds"),
 			"plancks": ("planck", "plancks"),
+		}
+		special_values = {
+			"galactic years": ("years", UNIT_GALACTIC_YEAR),
+			"megaanna": ("years", 1000000),
+			"millennia": ("years", 1000),
+			"fortnights": ("days", 14),
+			"weeks": ("days", 7),
 		}
 		subsecond_values = dict(
 			milliseconds=1e3,
@@ -919,6 +927,9 @@ class DynamicDT:
 						num = parse_num(match.group())
 						continue
 					assert unit
+					if unit in special_values:
+						unit, mult = special_values[unit]
+						num *= mult
 					if unit in subsecond_values:
 						delta.fraction += to_fraction(num, subsecond_values[unit])
 					else:
@@ -956,18 +967,21 @@ class DynamicDT:
 			for j in range(k, i):
 				test = " ".join(tokens[j:i])
 				try:
-					n = parse_num_long(test)
+					num = parse_num_long(test)
 				except Exception:
 					pass
 				else:
-					if n is not None:
+					if num is not None:
 						if neg:
-							n = -n
+							num = -num
 						unit = timeunits[token]
+						if unit in special_values:
+							unit, mult = special_values[unit]
+							num *= mult
 						if unit in subsecond_values:
-							delta.fraction += to_fraction(n, subsecond_values[unit])
+							delta.fraction += to_fraction(num, subsecond_values[unit])
 						else:
-							setattr(delta, unit, getattr(delta, unit) + n)
+							setattr(delta, unit, getattr(delta, unit) + num)
 						tokens = tokens[:j] + tokens[i + 1 + (neg is not None):]
 						i = j
 						continue
