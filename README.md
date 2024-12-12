@@ -5,7 +5,7 @@
 `python3 -m pip install dynamic-datetime` - Linux
 
 ## Usage
-- Usage examples (date of testing is 2024/08/12)
+- Usage examples (date of testing is 2024/12/08)
 ```python
 from dynamic_dt import DynamicDT, TimeDelta, get_timezone
 
