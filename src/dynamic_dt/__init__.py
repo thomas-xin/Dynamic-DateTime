@@ -1,3 +1,4 @@
+import copy
 import datetime
 import fractions
 import functools
@@ -48,13 +49,27 @@ def round_min(x) -> number:
 			return y
 	return x
 
+def round_frac(x) -> number:
+	"Casts a number to fraction or integer."
+	if x is None:
+		return x
+	if math.isfinite(x):
+		if isinstance(x, float):
+			x = fractions.Fraction(round(x * 10 ** 10), 10 ** 10)
+		if x.is_integer():
+			return int(x)
+		y = int(x)
+		if x == y:
+			return y
+	return x
+
 def parse_num(s):
-	"Parses a number, may be negative or a float."
+	"Parses a number, may be negative or a non-integer."
 	integer = s.split(".", 1)[0]
 	if len(integer) > 16:
 		return int(integer)
 	else:
-		return round_min(float(s))
+		return round_min(fractions.Fraction(s))
 
 def parse_num_long(s):
 	"Parses natural language as numbers."
@@ -248,23 +263,23 @@ def month_days(year, month) -> int:
 
 UNIT_GALACTIC_YEAR = 226814000
 UNIT_YEAR = 31556925
-UNIT_MONTH = 30.4368489583333333
+UNIT_MONTH = fractions.Fraction(46751, 1536)
 
 @functools.total_ordering
 class TimeDelta:
-	"Custom timedelta class that can store both exact representations of years and months, as well as timestamp deltas in seconds. Where ambiguous, a galactic year is treated as exactly 226814000 years, a year is treated as exactly 31556925 seconds, and a month is treated as 30.4368489583333333 days."
+	"Custom timedelta class that can store both exact representations of years and months, as well as timestamp deltas in seconds. Where ambiguous, a galactic year is treated as exactly 226814000 years, a year is treated as exactly 31556925 seconds, and a month is treated as 46751/1536 (30.436848958[3]) days."
 
 	__slots__ = ("years", "months", "days", "hours", "minutes", "seconds", "fraction", "_total_seconds")
 
 	def __init__(self, years=0, months=0, days=0, hours=0, minutes=0, seconds=0, fraction=0, total_seconds=None, **kwargs):
-		self.years = round_min(years)
-		self.months = round_min(months)
-		self.days = round_min(days)
-		self.hours = round_min(hours)
-		self.minutes = round_min(minutes)
-		self.seconds = round_min(seconds)
-		self.fraction = round_min(fraction)
-		self._total_seconds = round_min(total_seconds) if total_seconds else None
+		self.years = round_frac(years)
+		self.months = round_frac(months)
+		self.days = round_frac(days)
+		self.hours = round_frac(hours)
+		self.minutes = round_frac(minutes)
+		self.seconds = round_frac(seconds)
+		self.fraction = round_frac(fraction)
+		self._total_seconds = round_frac(total_seconds) if total_seconds else None
 
 	def __repr__(self):
 		return self.__class__.__name__ + repr(tuple(getattr(self, k) for k in self.__slots__))
@@ -298,7 +313,7 @@ class TimeDelta:
 		for k, v in data.items():
 			if not v:
 				continue
-			if v != 1:
+			if v != 1 and v != -1:
 				if k in plural:
 					k = plural[k]
 				else:
@@ -466,6 +481,9 @@ class DynamicDT:
 			return
 		raise TypeError("Unpickling failed:", s)
 
+	def copy(self):
+		return copy.deepcopy(self)
+
 	def __init__(self, *args, **kwargs):
 		self.parsed_as = None
 		tzinfo = kwargs.pop("tzinfo", None)
@@ -549,7 +567,7 @@ class DynamicDT:
 		if not other:
 			return self
 		if isinstance(other, TimeDelta):
-			return self.add(**other.to_dict())
+			return self.copy().add(**other.to_dict())
 		if isinstance(other, dateutil.relativedelta.relativedelta):
 			return self.__class__.fromdatetime(self._dt + other).set_offset(self.offset)
 		if not isinstance(other, datetime.timedelta):
@@ -564,7 +582,7 @@ class DynamicDT:
 		if not other:
 			return self
 		if isinstance(other, TimeDelta):
-			return self.add(**other.negate().to_dict())
+			return self.copy().add(**other.negate().to_dict())
 		if isinstance(other, dateutil.relativedelta.relativedelta):
 			return self.__class__.fromdatetime(self._dt + other).set_offset(self.offset)
 		if hasattr(other, "total_seconds"):
@@ -705,24 +723,24 @@ class DynamicDT:
 		return self.fromtimestamp(self.timestamp_exact(), tz=tz)
 
 	@property
-	def year(self):
+	def year(self) -> int:
 		return self._dt.year + self.offset
 
-	def as_year(self):
+	def as_year(self) -> str:
 		y = abs(self.year)
 		year = f"{'%04d' % y}"
 		if self.year < 0:
 			year += " BCE"
 		return year
 
-	def as_date(self):
+	def as_date(self) -> str:
 		y = abs(self.year)
 		date = f"{'%04d' % y}-{'%02d' % self.month}-{'%02d' % self.day}"
 		if self.year < 0:
 			date += " BCE"
 		return date
 
-	def as_time(self):
+	def as_time(self) -> str:
 		"Converts to human-readable timestamp string."
 		y = abs(self.year)
 		time = f"{'%04d' % y}-{'%02d' % self.month}-{'%02d' % self.day} {'%02d' % self.hour}:{'%02d' % self.minute}:{'%02d' % self.second}"
@@ -734,14 +752,14 @@ class DynamicDT:
 			time += " " + get_name(self.tzinfo)
 		return time
 
-	def as_full(self):
+	def as_full(self) -> str:
 		"Converts to human-readable natural language string."
 		weekday = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")[self.weekday() - 1]
 		month = ("January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December")[self.month - 1]
 		year = str(abs(self.year)) + " BCE" * (self.year < 0)
 		return f"{weekday} {self.day} {month} {year} at {'%02d' % self.hour}:{'%02d' % self.minute}"
 
-	def as_iso(self):
+	def as_iso(self) -> str:
 		"Converts to ISO-compliant timestamp string where possible."
 		y = abs(self.year)
 		yr = '%04d' % y
@@ -759,14 +777,14 @@ class DynamicDT:
 		return time
 	isoformat = as_iso
 
-	def as_discord(self, strict=True):
+	def as_discord(self, strict=True) -> str:
 		"Converts to timezone-naive Discord-compliant absolute timestamp where possible."
 		ts = round(self.timestamp_exact())
 		if not strict or ts in range(0, 8640000000001):
 			return f"<t:{round(self.timestamp())}:F>"
 		return f"`{self.as_full()}`"
 
-	def as_rel_discord(self, strict=True):
+	def as_rel_discord(self, strict=True) -> str:
 		"Converts to timezone-naive Discord-compliant relative timestamp where possible."
 		ts = round(self.timestamp_exact())
 		if not strict or ts in range(0, 8640000000001):
@@ -815,6 +833,8 @@ class DynamicDT:
 
 	@classmethod
 	def parse_delta(cls, s, return_remainder=False):
+		if not isinstance(s, str):
+			s = str(s)
 		try:
 			n = time_parse(s)
 		except Exception:
@@ -994,7 +1014,9 @@ class DynamicDT:
 		return delta
 
 	@classmethod
-	def parse(cls, s, timestamp=None, timezone=None):
+	def parse(cls, s="", timestamp=None, timezone=None):
+		if not isinstance(s, str):
+			s = str(s)
 		tokens = s.casefold().strip().replace(",", " ").split()
 		parsed_as = []
 
