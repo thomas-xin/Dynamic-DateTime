@@ -29,6 +29,7 @@ def cast_str(s) -> str:
 	return str(s)
 
 def to_fraction(x, y):
+	"Converts two numbers to a fraction. Required as fractions.Fraction does not accept floats in the divisor."
 	if isinstance(x, int) and isinstance(y, int):
 		return fractions.Fraction(x, y)
 	if not isinstance(x, fractions.Fraction):
@@ -196,6 +197,7 @@ def get_offset(tzinfo, dt=None):
 	return datetime.datetime.now(tz=tzinfo).utcoffset().total_seconds()
 
 def retrieve_tz(tz):
+	"Gets a timezone from a string, retrying with the last part of the string if the first attempt fails."
 	tz = tz.casefold()
 	try:
 		return TIMEZONES[tz]
@@ -360,6 +362,7 @@ class TimeDelta:
 		if isinstance(other, self.__class__):
 			for k in self.__slots__:
 				setattr(self, k, getattr(self, k) + getattr(other, k))
+			return self.normalise()
 		if isinstance(other, datetime.timedelta):
 			self.days += other.days
 			self.seconds += other.seconds
@@ -372,6 +375,7 @@ class TimeDelta:
 		if isinstance(other, self.__class__):
 			for k in self.__slots__:
 				setattr(self, k, getattr(self, k) - getattr(other, k))
+			return self.normalise()
 		if isinstance(other, datetime.timedelta):
 			self.days -= other.days
 			self.seconds -= other.seconds
@@ -381,6 +385,21 @@ class TimeDelta:
 		return NotImplemented
 
 	def normalise(self):
+		"""
+		Normalize the date and time components of the object.
+
+		This method adjusts the years, months, days, hours, minutes, seconds, and fraction
+		attributes of the object to ensure they are within their conventional ranges.
+		For example, if the number of months exceeds 12, it will be converted into years
+		and months. Similarly, if the number of days exceeds the number of days in a month,
+		it will be converted into months and days, and so on.
+
+		If the object represents a negative duration, it will be temporarily negated for
+		normalization and then negated again to restore its original sign.
+
+		Returns:
+			self: The normalized object.
+		"""
 		negative = self.is_negative()
 		if negative:
 			self.negate()
@@ -677,6 +696,21 @@ class DynamicDT:
 		return self
 
 	def replace(self, time=None, fraction=None, **kwargs):
+		"""
+		Replace specified components of the datetime object.
+
+		Parameters:
+		time (int, optional): Time in seconds since midnight to replace the time part of the datetime.
+		fraction (fractions.Fraction, optional): Fractional part of the second to replace.
+		**kwargs: Arbitrary keyword arguments corresponding to datetime components (e.g., year, month, day, hour, minute, second, microsecond, tzinfo).
+
+		Returns:
+		self: Updated instance of the datetime object with replaced components.
+
+		Raises:
+		ValueError: If any of the provided datetime components are out of their valid range.
+		AssertionError: If the provided time is not within the range [0, 86400).
+		"""
 		offs = None
 		if kwargs:
 			# Replace everything using standard datetime, except year (which is extended)
@@ -833,6 +867,28 @@ class DynamicDT:
 
 	@classmethod
 	def parse_delta(cls, s, return_remainder=False):
+		"""
+		Parse a time delta from a string representation.
+		Args:
+			s (str): The string representation of the time delta.
+			return_remainder (bool, optional): If True, return the remainder of the string that could not be parsed. Defaults to False.
+		Returns:
+			TimeDelta: The parsed time delta.
+			tuple: If return_remainder is True, returns a tuple containing the parsed time delta and the remainder of the string.
+		Raises:
+			ValueError: If the input string contains unrecognized tokens.
+		Examples:
+			>>> parse_delta("1y 2mo 3d")
+			TimeDelta(years=1, months=2, days=3)
+			>>> parse_delta("1y2mo3d4h30m57s")
+			TimeDelta(years=1, months=2, days=3, hours=4, minutes=30, seconds=57)
+			>>> parse_delta("1y 2mo 3d", return_remainder=True)
+			(TimeDelta(years=1, months=2, days=3), "")
+			>>> parse_delta("1y 2mo 3d and 4h", return_remainder=True)
+			(TimeDelta(years=1, months=2, days=3, hours=4), "")
+			>>> parse_delta("1y 2mo 3d before 4h", return_remainder=True)
+			(TimeDelta(years=1, months=2, days=3, hours=-4), "")
+		"""
 		if not isinstance(s, str):
 			s = str(s)
 		try:
@@ -1015,6 +1071,36 @@ class DynamicDT:
 
 	@classmethod
 	def parse(cls, s="", timestamp=None, timezone=None):
+		"""
+		Parses a given string to create a datetime object with various parsing modes.
+		Args:
+			s (str): The string to parse. Defaults to an empty string.
+			timestamp (float, optional): A Unix timestamp to use as a reference point. Defaults to None.
+			timezone (str, optional): A timezone string to use for the datetime object. Defaults to None.
+		Returns:
+			datetime: A datetime object parsed from the input string.
+		Raises:
+			ValueError: If the mode is "unix" and the input string is not a valid Unix timestamp.
+		Parsing Modes:
+			- "now": Current datetime.
+			- "now+": Relative to current datetime.
+			- "noon": 12 PM.
+			- "midnight": 12 AM.
+			- "last", "previous", "next", "this", "today", "tomorrow", "yesterday", "unix": Relative datetime.
+			- "bce", "bc", "ad", "ce": Common era indicators.
+			- "in", "at": Timezone indicators.
+			- "natural_language": Natural language parsing.
+			- "year": Year parsing.
+			- "yyyymmdd": Date parsing in YYYYMMDD format.
+			- "unix_timestamp": Unix timestamp parsing.
+			- "value": General value parsing.
+			- "delta": Time delta parsing.
+			- "current": Current datetime.
+		Notes:
+			- The function handles various datetime formats and natural language inputs.
+			- It supports parsing of timezones and relative dates.
+			- The function can handle BCE/CE indicators and Unix timestamps.
+		"""
 		if not isinstance(s, str):
 			s = str(s)
 		tokens = s.casefold().strip().replace(",", " ").split()
