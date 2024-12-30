@@ -461,6 +461,10 @@ class TemporaryDT:
 		self.set.update(kwargs)
 		return self
 
+	def negate(self):
+		for k in self.set:
+			setattr(self, k, -getattr(self, k))
+
 	def __add__(self, other):
 		self.deltas.append(other)
 		return self
@@ -1079,6 +1083,15 @@ class DynamicDT:
 						delta.fraction += to_fraction(num, subsecond_values[unit])
 					else:
 						setattr(delta, unit, num)
+				if i < len(tokens) - 1:
+					token2 = tokens[i]
+					if token2 in ("before", "ago", "from"):
+						delta.negate()
+						tokens.pop(i)
+					elif token2 in ("after", "past", "in"):
+						tokens.pop(i)
+					elif token2 == "and":
+						tokens.pop(i)
 				continue
 			i += 1
 		i = len(tokens) - 1
