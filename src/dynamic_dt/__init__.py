@@ -958,6 +958,8 @@ class DynamicDT:
 		"""
 		if not isinstance(s, str):
 			s = str(s)
+		if s.startswith("in "):
+			s = s[3:]
 		try:
 			n = time_parse(s)
 		except Exception:
