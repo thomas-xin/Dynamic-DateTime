@@ -434,6 +434,8 @@ class TimeDelta:
 	normalize = normalise
 
 	def __eq__(self, other):
+		if not isinstance(other, self.__class__):
+			return False
 		return self.total_seconds() == (other.total_seconds() if hasattr(other, "total_seconds") else other)
 
 	def __lt__(self, other):
@@ -441,6 +443,7 @@ class TimeDelta:
 
 
 class TemporaryDT:
+	"""A temporary datetime object that does not perform its own logic, but can be used to set attributes and deltas before creating a DynamicDT object. Used to intercept dateutil's parser output to apply necessary adjustments."""
 
 	def __init__(self):
 		self.year = 0
@@ -464,7 +467,69 @@ class TemporaryDT:
 
 
 class DynamicDT:
-	"A datetime-compatible object that enables effectively unlimited range and precision."
+	"""
+	A flexible datetime class that extends the functionality of Python's built-in datetime.
+	The DynamicDT class provides extended datetime functionality including:
+	- Support for dates beyond the standard datetime range
+	- Fractional seconds with arbitrary precision
+	- BCE/CE date handling
+	- Natural language parsing
+	- Multiple string representation formats
+	- Discord timestamp compatibility
+	- Enhanced timezone support
+	Attributes:
+		parsed_as (list): Records the parsing methods used to create the datetime object
+		_dt (datetime): Internal datetime object
+		_offset (int): Year offset from standard datetime range
+		_ts (Fraction): Cached timestamp value
+		_fraction (Fraction): Fractional part of second
+		tzinfo (datetime.tzinfo): Timezone information
+	Class Methods:
+		utcfromtimestamp(ts): Create a UTC datetime from a timestamp
+		fromtimestamp(ts, tz=None): Create a datetime from a timestamp in given timezone
+		to_utc(self): Convert datetime to UTC
+		fromdatetime(dt, tz=None): Create from standard datetime object
+		utcnow(): Get current UTC datetime
+		now(tz=None): Get current datetime in given timezone
+		unix(): Get current Unix timestamp
+		parse_delta(s, return_remainder=False): Parse a time duration string
+		parse(s="", timestamp=None, timezone=None): Parse datetime from string
+	Instance Methods:
+		timestamp(): Get Unix timestamp as int or float
+		timestamp_exact(): Get exact Unix timestamp as Fraction
+		copy(): Create a deep copy
+		add_years(years=1): Add specified number of years
+		add_months(months=1): Add specified number of months
+		add(**kwargs): Add specified time units
+		replace(**kwargs): Replace datetime components
+		cast(tz=UTC): Convert to different timezone
+		as_year(): Format year string
+		as_date(): Format date string
+		as_time(): Format time string
+		as_full(): Format full natural language string
+		as_iso(): Format ISO-8601 string
+		as_discord(): Format Discord absolute timestamp
+		as_rel_discord(): Format Discord relative timestamp
+	Properties:
+		fraction: Get fractional part of second
+		offset: Get year offset
+		year: Get full year including offset
+	Magic Methods:
+		__add__, __radd__: Add time delta or number
+		__sub__: Subtract time delta, datetime or number
+		__eq__, __lt__, __le__, __gt__, __ge__: Compare datetimes
+		__str__: Convert to string using as_time()
+		__repr__: Detailed string representation
+		>>> dt = DynamicDT.parse("2024-01-01 12:00:00")
+		>>> dt.as_full()
+		'Monday 1 January 2024 at 12:00'
+		>>> dt = DynamicDT.parse("1000 BCE")
+		>>> dt.as_date()
+		'1000-01-01 BCE'
+		>>> dt = DynamicDT.parse("next monday at 3pm")
+		>>> dt.as_discord()
+		'<t:1234567890:F>'
+	"""
 
 	__slots__ = ("__weakref__", "_dt", "_offset", "_ts", "_fraction", "parsed_as")
 
@@ -659,6 +724,8 @@ class DynamicDT:
 		return self.fromdatetime(other) - self
 
 	def __eq__(self, other):
+		if not isinstance(other, self.__class__):
+			return False
 		return self.year == other.year and self.timestamp() == other.timestamp()
 
 	def __lt__(self, other):
