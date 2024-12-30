@@ -1320,10 +1320,10 @@ class DynamicDT:
 					last_unit += "s"
 					unspec = True
 				s = " ".join(tokens)
-			# Parse remaining strings, storing in a temporary tracked false datetime
+			# Parse remaining strings, storing in our intercepted datetime
 			if s:
 				parsed_as.append("value")
-				tokens = re.sub(r"[0-9](T)[0-9]", " ", s).split()
+				tokens = s.split()
 				for i, t in enumerate(tuple(tokens)):
 					if re.fullmatch(r"[+-]?[0-9]+[\-/\\.][0-9]+[\-/\\.][0-9]+", t):
 						coerced = t.replace(".", "-").replace("/", "-").replace("\\", "-").rsplit("-", 2)
@@ -1336,7 +1336,7 @@ class DynamicDT:
 						tokens.pop(i)
 				if tokens:
 					s = " ".join(tokens)
-					temp = dateutil.parser.parse(s, default=temp, fuzzy=True)
+					temp = dateutil.parser.parse(s, default=temp, fuzzy=False)
 			# Zero out all units after the recognised ones; i.e. for "March 2020" the day is set to 1, and the hour, minute, second, etc are all set to 0
 			for unit in replaced_units:
 				if unit == "week":
@@ -1388,6 +1388,8 @@ class DynamicDT:
 					self += TimeDelta(days=-1)
 				elif mode == "tomorrow":
 					self += TimeDelta(days=1)
+		else:
+			raise ValueError(f"Failed to parse {s}")
 
 		if offset:
 			parsed_as.append("delta")
