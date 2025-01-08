@@ -262,6 +262,22 @@ def month_days(year, month) -> int:
 		return 28
 	return 31
 
+def display_to_precision(frac, precision=20):
+	"Converts a fraction to a string with a specified precision."
+	if not frac:
+		return "0"
+	if isinstance(frac, int):
+		return str(frac)
+	if isinstance(frac, float):
+		return str(round(frac, precision))
+	if precision <= 0:
+		return str(round(frac))
+	import decimal
+	with decimal.localcontext() as ctx:
+		ctx.prec = precision
+		d = decimal.Decimal(frac.numerator) / decimal.Decimal(frac.denominator)
+		return format(d, f".{precision}f").rstrip("0").removesuffix(".")
+
 
 UNIT_GALACTIC_YEAR = 226814000
 UNIT_YEAR = 31556925
@@ -287,6 +303,9 @@ class TimeDelta:
 		return self.__class__.__name__ + repr(tuple(getattr(self, k) for k in self.__slots__))
 
 	def __str__(self):
+		return self.to_string()
+
+	def to_string(self, precision=9):
 		self.normalise()
 		neg_years = self.years < 0
 		gy, y = divmod(abs(self.years), UNIT_GALACTIC_YEAR)
@@ -305,7 +324,7 @@ class TimeDelta:
 			day=self.days,
 			hour=self.hours,
 			minute=self.minutes,
-			second=round_min(self.seconds + float(self.fraction)),
+			second=round_min(self.seconds + self.fraction),
 		))
 		plural = dict(
 			megaannum="megaanna",
@@ -320,7 +339,7 @@ class TimeDelta:
 					k = plural[k]
 				else:
 					k += "s"
-			out.append(f"{v} {k}")
+			out.append(f"{display_to_precision(v, precision)} {k}")
 		if not out:
 			out.append("0 seconds")
 		return " ".join(map(str, out))
@@ -630,6 +649,10 @@ class DynamicDT:
 			self._ts = self._timestamp_exact()
 		return self._ts
 
+	def timestamp_string(self, precision=9) -> str:
+		"Returns the full unix timestamp as a string."
+		return display_to_precision(self.timestamp_exact(), precision)
+
 	@property
 	def fraction(self) -> fractions.Fraction | int:
 		return self._fraction or 0
@@ -845,12 +868,12 @@ class DynamicDT:
 			date += " BCE"
 		return date
 
-	def as_time(self) -> str:
+	def as_time(self, precision=9) -> str:
 		"Converts to human-readable timestamp string."
 		y = abs(self.year)
 		time = f"{'%04d' % y}-{'%02d' % self.month}-{'%02d' % self.day} {'%02d' % self.hour}:{'%02d' % self.minute}:{'%02d' % self.second}"
 		if self.fraction:
-			time += str(float(self.fraction)).replace("-0","-", 1).lstrip("0")
+			time += display_to_precision(self.fraction, precision).lstrip("0")
 		if self.year < 0:
 			time += " BCE"
 		if self.tzinfo:
@@ -864,7 +887,7 @@ class DynamicDT:
 		year = str(abs(self.year)) + " BCE" * (self.year < 0)
 		return f"{weekday} {self.day} {month} {year} at {'%02d' % self.hour}:{'%02d' % self.minute}"
 
-	def as_iso(self) -> str:
+	def as_iso(self, precision=9) -> str:
 		"Converts to ISO-compliant timestamp string where possible."
 		y = abs(self.year)
 		yr = '%04d' % y
@@ -872,7 +895,7 @@ class DynamicDT:
 			yr = "+-"[self.year < 0] + yr
 		time = f"{yr}-{'%02d' % self.month}-{'%02d' % self.day}T{'%02d' % self.hour}:{'%02d' % self.minute}:{'%02d' % self.second}"
 		if self.fraction:
-			time += str(float(self.fraction)).replace("-0","-", 1).lstrip("0")
+			time += display_to_precision(self.fraction, precision).lstrip("0")
 		offset = get_offset(self.tzinfo)
 		if offset:
 			negative, offset = offset < 0, abs(offset)
@@ -973,7 +996,7 @@ class DynamicDT:
 			if return_remainder:
 				return td, ""
 			return td
-		tokens = s.strip().split()
+		tokens = s.strip().replace(",", " ").split()
 		timechecks = {
 			"galactic years": ("gy", "galactic year", "galactic years"),
 			"megaanna": ("my", "myr", "megaannum", "megaanna"),

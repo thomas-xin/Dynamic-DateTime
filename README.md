@@ -5,7 +5,7 @@
 `python3 -m pip install dynamic-datetime` - Linux
 
 ## Usage
-- Usage examples (date of testing is 2024/12/08)
+- Usage examples (date used for most examples is 2024/12/08)
 ```python
 from dynamic_dt import DynamicDT, TimeDelta, get_timezone
 
@@ -24,7 +24,7 @@ DynamicDT.parse("300-06-09 bce 6pm aqtt")    # 0300-06-09 18:00:00 BCE AQTT
 # Arithmetic
 DynamicDT.parse("now+1h") - DynamicDT.parse("now")    # 59 minutes 59.9999153 seconds
 DynamicDT.parse("now+1h", timestamp=1733639741) - DynamicDT.parse("now", timestamp=1733639741)    # 1 hour
-DynamicDT.parse("now+1h utc-1.5") + TimeDelta(years=9876543210, attoseconds=-1)    # 9876545234-12-08 06:17:13.1265439 UTC-1:30
+DynamicDT.parse("now+1h utc-1.5") + DynamicDT.parse_delta("9876543210 years, -1 attoseconds")    # 9876545234-12-08 06:17:13.1265439 UTC-1:30
 
 # Advanced
 import datetime
@@ -32,6 +32,7 @@ import pytz
 
 repr(DynamicDT.parse_delta("1 year"))    # TimeDelta(1, 0, 0, 0, 0, 0, 0, None)
 DynamicDT.parse_delta("1 year").total_seconds()    # 31556925
+DynamicDT.parse_delta("9876543210 years, -1 attoseconds").to_string(precision=20)    # 43 galactic years 123 megaanna 541 millennia 210 years -1 day 23 hours 59 minutes 59.999999999999999999 seconds
 repr(DynamicDT.parse("4 years after"))    # DynamicDT(2028, 12, 8, 6, 48, 14, fraction=Fraction(4312121, 10000000), tzinfo=get_timezone('UTC'))
 DynamicDT.parse("4 years after").as_iso()    # 2028-12-08T06:48:43.8579817Z
 DynamicDT.parse("4 years after").as_full()    # Thursday 8 December 2028 at 06:49
@@ -46,4 +47,6 @@ repr(DynamicDT.now(tz=datetime.timezone.utc))    # DynamicDT(2024, 12, 8, 6, 56,
 DynamicDT(1234, 5, 6, 7, tzinfo=pytz.timezone("US/Mountain"))    # DynamicDT(1234, 5, 6, 7, 0, 0, tzinfo=get_timezone('US/Mountain'))
 DynamicDT.unix()    # Fraction(17336412228141707, 10000000)
 repr(DynamicDT.fromtimestamp(-100000000000, tz=get_timezone("pacific")))   # DynamicDT(-1199, 2, 15, 6, 13, 20, tzinfo=get_timezone('US/Pacific'))
+DynamicDT.parse("1 yoctosecond from now").timestamp_string(100)    # 1736318072.652227100000000000000001
+DynamicDT.parse("1 quectosecond until now").timestamp_string(100)    # 1736318184.458186399999999999999999999999
 ```
