@@ -1085,10 +1085,10 @@ class DynamicDT:
 						setattr(delta, unit, num)
 				if i < len(tokens) - 1:
 					token2 = tokens[i]
-					if token2 in ("before", "ago", "from"):
+					if token2 in ("before", "ago", "to"):
 						delta.negate()
 						tokens.pop(i)
-					elif token2 in ("after", "past", "in"):
+					elif token2 in ("after", "past", "in", "from"):
 						tokens.pop(i)
 					elif token2 == "and":
 						tokens.pop(i)
@@ -1099,11 +1099,11 @@ class DynamicDT:
 			token = tokens[i]
 			# Parse "before" and "after" keywords at the end of a timeframe
 			neg = None
-			if token in ("before", "ago", "from"):
+			if token in ("before", "ago", "to"):
 				neg = True
 				i -= 1
 				token = tokens[i]
-			elif token in ("after", "past", "in"):
+			elif token in ("after", "past", "in", "from"):
 				neg = False
 				i -= 1
 				token = tokens[i]
