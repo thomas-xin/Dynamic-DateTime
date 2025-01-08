@@ -958,7 +958,7 @@ class DynamicDT:
 			>>> parse_delta("1y 2mo 3d and 4h", return_remainder=True)
 			(TimeDelta(years=1, months=2, days=3, hours=4), "")
 			>>> parse_delta("1y 2mo 3d before 4h", return_remainder=True)
-			(TimeDelta(years=1, months=2, days=3, hours=-4), "")
+			(TimeDelta(years=-1, months=-2, days=-3, hours=4), "")
 		"""
 		if not isinstance(s, str):
 			s = str(s)
@@ -1085,7 +1085,7 @@ class DynamicDT:
 						setattr(delta, unit, num)
 				if i < len(tokens) - 1:
 					token2 = tokens[i]
-					if token2 in ("before", "ago", "to"):
+					if token2 in ("before", "ago", "to", "until", "till"):
 						delta.negate()
 						tokens.pop(i)
 					elif token2 in ("after", "past", "in", "from"):
@@ -1099,7 +1099,7 @@ class DynamicDT:
 			token = tokens[i]
 			# Parse "before" and "after" keywords at the end of a timeframe
 			neg = None
-			if token in ("before", "ago", "to"):
+			if token in ("before", "ago", "to", "until", "till"):
 				neg = True
 				i -= 1
 				token = tokens[i]

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "Dynamic-DateTime"
-version = "0.0.9"
+version = "0.0.10"
 authors = [
   { name="thomas-xin", email="thomasxin@gmail.com" },
 ]
