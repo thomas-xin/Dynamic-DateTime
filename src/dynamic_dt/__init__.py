@@ -854,6 +854,7 @@ class DynamicDT(datetime.datetime):
 
 	def cast(self, tz=datetime.timezone.utc):
 		return self.fromtimestamp(self.timestamp_exact(), tz=tz)
+	astimezone = cast
 
 	@property
 	def year(self) -> int:
