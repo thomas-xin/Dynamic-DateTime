@@ -885,30 +885,24 @@ class DynamicDT(datetime.datetime):
 		return round(self.fraction * 1e6)
 
 	@property
-	def weekday(self) -> int:
-		return self._dt.weekday()
-
-	@property
-	def isoweekday(self) -> int:
-		return self._dt.isoweekday()
-
-	@property
-	def isocalendar(self) -> tuple[int, int, int]:
-		return self._dt.isocalendar()
-
-	@property
 	def tzinfo(self) -> datetime.tzinfo:
 		return self._dt.tzinfo
 
-	@property
+	def weekday(self) -> int:
+		return self._dt.weekday()
+
+	def isoweekday(self) -> int:
+		return self._dt.isoweekday()
+
+	def isocalendar(self) -> tuple[int, int, int]:
+		return self._dt.isocalendar()
+
 	def date(self) -> datetime.date:
 		return self._dt.date()
 
-	@property
 	def time(self) -> datetime.time:
 		return self._dt.time()
 
-	@property
 	def timetz(self) -> datetime.time:
 		return self._dt.timetz()
 
