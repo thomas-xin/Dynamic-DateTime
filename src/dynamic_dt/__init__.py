@@ -269,7 +269,7 @@ def display_to_precision(frac, precision=20):
 	if isinstance(frac, int):
 		return str(frac)
 	if isinstance(frac, float):
-		return str(round(frac, precision))
+		return str(round(frac, precision)).removesuffix(".0")
 	if precision <= 0:
 		return str(round(frac))
 	import decimal
@@ -489,7 +489,7 @@ class TemporaryDT:
 		return self
 
 
-class DynamicDT:
+class DynamicDT(datetime.datetime):
 	"""
 	A flexible datetime class that extends the functionality of Python's built-in datetime.
 	The DynamicDT class provides extended datetime functionality including:
@@ -609,6 +609,11 @@ class DynamicDT:
 			f = (f + usf) if f else usf
 		self.set_fraction(f)
 		self.set_offset(offs)
+
+	def __new__(cls, *args, **kwargs):
+		self = super().__new__(cls, 1, 1, 1)
+		self.__init__(*args, **kwargs)
+		return self
 
 	def __getattr__(self, k):
 		try:
@@ -853,6 +858,58 @@ class DynamicDT:
 	@property
 	def year(self) -> int:
 		return self._dt.year + self.offset
+
+	@property
+	def month(self) -> int:
+		return self._dt.month
+
+	@property
+	def day(self) -> int:
+		return self._dt.day
+
+	@property
+	def hour(self) -> int:
+		return self._dt.hour
+
+	@property
+	def minute(self) -> int:
+		return self._dt.minute
+
+	@property
+	def second(self) -> int:
+		return self._dt.second
+
+	@property
+	def microsecond(self) -> int:
+		return round(self.fraction * 1e6)
+
+	@property
+	def weekday(self) -> int:
+		return self._dt.weekday()
+
+	@property
+	def isoweekday(self) -> int:
+		return self._dt.isoweekday()
+
+	@property
+	def isocalendar(self) -> tuple[int, int, int]:
+		return self._dt.isocalendar()
+
+	@property
+	def tzinfo(self) -> datetime.tzinfo:
+		return self._dt.tzinfo
+
+	@property
+	def date(self) -> datetime.date:
+		return self._dt.date()
+
+	@property
+	def time(self) -> datetime.time:
+		return self._dt.time()
+
+	@property
+	def timetz(self) -> datetime.time:
+		return self._dt.timetz()
 
 	def as_year(self) -> str:
 		y = abs(self.year)
