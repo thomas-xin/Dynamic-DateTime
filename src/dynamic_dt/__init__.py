@@ -1,4 +1,3 @@
-import copy
 import datetime
 import fractions
 import functools
@@ -589,7 +588,7 @@ class DynamicDT(datetime.datetime):
 		raise TypeError("Unpickling failed:", s)
 
 	def copy(self):
-		return copy.deepcopy(self)
+		return self.__class__.fromdatetime(self._dt).set_offset(self.offset)
 
 	def __init__(self, *args, **kwargs):
 		self.parsed_as = None
