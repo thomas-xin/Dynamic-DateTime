@@ -1168,11 +1168,11 @@ class DynamicDT(datetime.datetime):
 						tokens.pop(i)
 				continue
 			i += 1
+		neg = None
 		i = len(tokens) - 1
 		while i >= 0:
 			token = tokens[i]
 			# Parse "before" and "after" keywords at the end of a timeframe
-			neg = None
 			if token in ("before", "ago", "to", "until", "till"):
 				neg = True
 				i -= 1
