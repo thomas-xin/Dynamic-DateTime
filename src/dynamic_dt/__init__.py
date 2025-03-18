@@ -842,7 +842,7 @@ class DynamicDT(datetime.datetime):
 			second, time = divmod(time, 1)
 			fraction = fractions.Fraction(time)
 			dt = dt.replace(hour=hour, minute=minute, second=second, microsecond=0)
-		fraction = fraction if fraction is not None else self.fraction
+		fraction = fraction if fraction is not None else getattr(self, "fraction", 0) or dt.microsecond / 1e6
 		if "tzinfo" in kwargs and isinstance(dt.tzinfo, pytz.BaseTzInfo) and dt.tzinfo._utcoffset.total_seconds() % 1800:
 			dt = dt.tzinfo.localize(dt.replace(tzinfo=None))
 		self = self.fromdatetime(dt)
