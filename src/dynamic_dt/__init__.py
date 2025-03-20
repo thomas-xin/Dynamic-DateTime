@@ -12,10 +12,9 @@ number = int | float
 YEAR = 31556952
 ERA_YEARS = 400
 ERA = YEAR * ERA_YEARS
+
 num_re = re.compile(r"[+-]?([0-9]*\.)?[0-9]+")
 ts_re = re.compile(r"<t:[+-]?[0-9]+[^0-9]")
-
-
 def is_number(s):
 	"More powerful version of s.isnumeric() that accepts negatives and floats."
 	return num_re.fullmatch(s.removesuffix("."))
@@ -124,6 +123,39 @@ def time_parse(ts, default="s"):
 	elif len(data) == 1:
 		mults = (1,) if default == "s" else (60,) if default == "m" else (3600,) if default == "h" else (86400,)
 	return round_min(sum(float(count) * mult for count, mult in zip(data, reversed(mults[:len(data)]))))
+
+LUNATION_0 = 947182440
+lunar_phases = {k: fractions.Fraction(v) for k, v in dict(
+	new_moon=0,
+	waxing_crescent=0.125,
+	first_quarter=0.25,
+	waxing_gibbous=0.375,
+	full_moon=0.5,
+	waning_gibbous=0.625,
+	last_quarter=0.75,
+	waning_crescent=0.875,
+).items()}
+lunar_phase_names = {k.replace("_", " "): v for k, v in lunar_phases.items()}
+def get_lunar_phase(dt):
+	days = to_fraction(dt.timestamp_exact() - LUNATION_0, 86400)
+	lunations = days / fractions.Fraction("29.5305888531")
+	return lunations % 1
+def closest_lunar_phase(dt, target_phase=0, mode=None):
+	phase = get_lunar_phase(dt)
+	phase_diff = (target_phase - phase)
+	match mode:
+		case "next":
+			if phase_diff < 0:
+				phase_diff += 1
+		case "last":
+			if phase_diff > 0:
+				phase_diff -= 1
+		case _:
+			if phase_diff < -0.5:
+				phase_diff += 1
+			if phase_diff > 0.5:
+				phase_diff -= 1
+	return dt + phase_diff * fractions.Fraction("29.5305888531") * 86400
 
 TIMEZONES = {}
 # Update timezone abbreviations list using pytz
@@ -966,7 +998,7 @@ class DynamicDT(datetime.datetime):
 	def as_rel_discord(self, strict=True) -> str:
 		"Converts to timezone-naive Discord-compliant relative timestamp where possible."
 		ts = round(self.timestamp_exact())
-		if not strict or ts in range(0, 8640000000001):
+		if not strict or ts in range(0, 8639998927200):
 			return f"<t:{round(self.timestamp())}:R>"
 		delta = self - self.now(tz=self.tzinfo)
 		if delta < 0:
@@ -1158,33 +1190,31 @@ class DynamicDT(datetime.datetime):
 					else:
 						setattr(delta, unit, num)
 				if i < len(tokens) - 1:
-					token2 = tokens[i]
-					if token2 in ("before", "ago", "to", "until", "till"):
-						delta.negate()
-						tokens.pop(i)
-					elif token2 in ("after", "past", "in", "from"):
-						tokens.pop(i)
-					elif token2 == "and":
-						tokens.pop(i)
+					match tokens[i]:
+						case "before" | "ago" | "to" | "until" | "till":
+							delta.negate()
+							tokens.pop(i)
+						case "after" | "past" | "in" | "from":
+							tokens.pop(i)
+						case "and":
+							tokens.pop(i)
 				continue
 			i += 1
 		neg = None
 		i = len(tokens) - 1
 		while i >= 0:
-			token = tokens[i]
 			# Parse "before" and "after" keywords at the end of a timeframe
-			if token in ("before", "ago", "to", "until", "till"):
-				neg = True
-				i -= 1
-				token = tokens[i]
-			elif token in ("after", "past", "in", "from"):
-				neg = False
-				i -= 1
-				token = tokens[i]
-			elif token == "and":
-				neg = neg or False
-				i -= 1
-				token = tokens[i]
+			match tokens[i]:
+				case "before" | "ago" | "to" | "until" | "till":
+					neg = True
+					i -= 1
+				case "after" | "past" | "in" | "from":
+					neg = False
+					i -= 1
+				case "and":
+					neg = neg or False
+					i -= 1
+			token = tokens[i]
 			# Retry from top if invalid timeunit detected
 			if token not in timeunits:
 				i -= 1
@@ -1262,19 +1292,32 @@ class DynamicDT(datetime.datetime):
 		tokens = s.casefold().strip().replace(",", " ").split()
 		parsed_as = []
 
+		moon_phase = None
+		for k, v in lunar_phase_names.items():
+			words = k.split()
+			try:
+				i = tokens.index(words.pop(0))
+			except ValueError:
+				continue
+			if len(tokens) - i - 1 >= len(words) and all(tokens[i + j] == w for j, w in enumerate(words, 1)):
+				moon_phase = v
+				tokens = tokens[:i] + tokens[i + len(words) + 1:]
+				break
+
 		mode = "next"
 		for i, token in enumerate(tuple(tokens)):
-			if token == "now":
-				tokens.pop(i)
-			elif token.startswith("now+") or token.startswith("now-"):
-				tokens[i] = token[3:]
-			elif token == "noon":
-				tokens[i] = "12PM"
-			elif token == "midnight":
-				tokens[i] = "12AM"
-			elif ts_re.match(token):
-				tokens[i] = token.split(":", 1)[-1].replace(">", ":").split(":", 1)[0] + ".0"
-				parsed_as.append("discord_timestamp")
+			match token:
+				case "now":
+					tokens.pop(i)
+				case _ if token.startswith("now+") or token.startswith("now-"):
+					tokens[i] = token[3:]
+				case "noon":
+					tokens[i] = "12PM"
+				case "midnight":
+					tokens[i] = "12AM"
+				case _ if ts_re.match(token):
+					tokens[i] = token.split(":", 1)[-1].replace(">", ":").split(":", 1)[0] + ".0"
+					parsed_as.append("discord_timestamp")
 		for m in ("last", "previous", "next", "this", "today", "tomorrow", "yesterday", "unix"):
 			if m in tokens:
 				tokens.remove(m)
@@ -1377,6 +1420,8 @@ class DynamicDT(datetime.datetime):
 				self = cls.fromtimestamp(timestamp, tz=tzinfo)
 			else:
 				self = cls.now(tz=tzinfo)
+			if moon_phase is not None:
+				self = closest_lunar_phase(self, moon_phase, mode="last" if mode in ("last", "previous", "yesterday") else None if mode in ("this", "unix") else "next")
 			now = self.timestamp_exact()
 			self = self.replace(time=0)
 			temp = TemporaryDT()
@@ -1448,28 +1493,31 @@ class DynamicDT(datetime.datetime):
 			for delta in temp.deltas:
 				self += delta
 			# Handle all cases of "last" and "next"
-			if last_unit == "days" and mode == "tomorrow":
-				self += TimeDelta(days=1)
-			elif last_unit and mode in ("next", "in") and temp.deltas and self.timestamp_exact() < now:
-				self += TimeDelta(days=7)
-			elif last_unit == "weeks" and mode in ("next", "in") and self.timestamp_exact() < now:
-				self += TimeDelta(days=7)
-			elif last_unit and mode in ("next", "in") and self.timestamp_exact() < now:
-				self += TimeDelta(**{last_unit: 1})
-			elif last_unit and mode in ("last", "from") and temp.deltas and self.timestamp_exact() > now:
-				self += TimeDelta(days=-7)
-			elif last_unit == "weeks" and mode in ("last", "from") and self.timestamp_exact() > now:
-				self += TimeDelta(days=-7)
-			elif last_unit and mode in ("last", "from") and self.timestamp_exact() > now:
-				self += TimeDelta(**{last_unit: -1})
-			elif last_unit == "days" and mode == "yesterday":
-				self += TimeDelta(days=-1)
+			match mode:
+				case "tomorrow" if last_unit == "days":
+					self += TimeDelta(days=1)
+				case "next" | "in" if last_unit and temp.deltas and self.timestamp_exact() < now:
+					self += TimeDelta(days=7)
+				case "next" | "in" if last_unit == "weeks" and self.timestamp_exact() < now:
+					self += TimeDelta(days=7)
+				case "next" | "in" if last_unit and self.timestamp_exact() < now:
+					self += TimeDelta(**{last_unit: 1})
+				case "last" | "from" if last_unit and temp.deltas and self.timestamp_exact() > now:
+					self += TimeDelta(days=-7)
+				case "last" | "from" if last_unit == "weeks" and self.timestamp_exact() > now:
+					self += TimeDelta(days=-7)
+				case "last" | "from" if last_unit and self.timestamp_exact() > now:
+					self += TimeDelta(**{last_unit: -1})
+				case "yesterday" if last_unit == "days":
+					self += TimeDelta(days=-1)
 		elif self is None:
 			parsed_as.append("current")
 			if timestamp:
 				self = cls.fromtimestamp(timestamp, tz=tzinfo)
 			else:
 				self = cls.now(tz=tzinfo)
+			if moon_phase is not None:
+				self = closest_lunar_phase(self, moon_phase, mode="last" if mode in ("last", "previous", "yesterday") else None if mode in ("this", "unix") else "next")
 			# Treat day indicators with no time indicators as midnight
 			if mode in ("today", "yesterday", "tomorrow"):
 				self = self.replace(time=0)
