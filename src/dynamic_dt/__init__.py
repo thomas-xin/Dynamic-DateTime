@@ -1436,6 +1436,7 @@ class DynamicDT(datetime.datetime):
 			else:
 				parsed_as.append("unix_timestamp")
 				self = cls.fromtimestamp(n, tz=tzinfo)
+			s = ""
 		elif mode == "unix":
 			raise ValueError(f"Expected a number representing unix timestamp in seconds, got {repr(s)}")
 
@@ -1545,7 +1546,7 @@ class DynamicDT(datetime.datetime):
 					self += TimeDelta(days=-1)
 				elif mode == "tomorrow":
 					self += TimeDelta(days=1)
-		else:
+		elif s:
 			raise ValueError(f"Failed to parse {s}")
 		if moon_phase is not None:
 			self = closest_lunar_phase(self, moon_phase, mode=moon_mode)
