@@ -1293,6 +1293,7 @@ class DynamicDT(datetime.datetime):
 		parsed_as = []
 
 		moon_phase = None
+		moon_mode = None
 		for k, v in lunar_phase_names.items():
 			words = k.split()
 			try:
@@ -1301,7 +1302,30 @@ class DynamicDT(datetime.datetime):
 				continue
 			if len(tokens) - i - 1 >= len(words) and all(tokens[i + j] == w for j, w in enumerate(words, 1)):
 				moon_phase = v
-				tokens = tokens[:i] + tokens[i + len(words) + 1:]
+				j = i + len(words)
+				tokens = tokens[:i] + tokens[j + 1:]
+				if len(tokens) and i > 0:
+					match tokens[i - 1]:
+						case "next":
+							moon_mode = "next"
+							tokens.pop(i - 1)
+							i -= 1
+						case "last":
+							moon_mode = "last"
+							tokens.pop(i - 1)
+							i -= 1
+						case "this":
+							moon_mode = None
+							tokens.pop(i - 1)
+							i -= 1
+				if len(tokens) > i:
+					match tokens[i]:
+						case "after":
+							moon_mode = "next"
+							tokens.pop(i)
+						case "before":
+							moon_mode = "last"
+							tokens.pop(i)
 				break
 
 		mode = "next"
@@ -1420,8 +1444,6 @@ class DynamicDT(datetime.datetime):
 				self = cls.fromtimestamp(timestamp, tz=tzinfo)
 			else:
 				self = cls.now(tz=tzinfo)
-			if moon_phase is not None:
-				self = closest_lunar_phase(self, moon_phase, mode="last" if mode in ("last", "previous", "yesterday") else None if mode in ("this", "unix") else "next")
 			now = self.timestamp_exact()
 			self = self.replace(time=0)
 			temp = TemporaryDT()
@@ -1516,8 +1538,6 @@ class DynamicDT(datetime.datetime):
 				self = cls.fromtimestamp(timestamp, tz=tzinfo)
 			else:
 				self = cls.now(tz=tzinfo)
-			if moon_phase is not None:
-				self = closest_lunar_phase(self, moon_phase, mode="last" if mode in ("last", "previous", "yesterday") else None if mode in ("this", "unix") else "next")
 			# Treat day indicators with no time indicators as midnight
 			if mode in ("today", "yesterday", "tomorrow"):
 				self = self.replace(time=0)
@@ -1527,6 +1547,8 @@ class DynamicDT(datetime.datetime):
 					self += TimeDelta(days=1)
 		else:
 			raise ValueError(f"Failed to parse {s}")
+		if moon_phase is not None:
+			self = closest_lunar_phase(self, moon_phase, mode=moon_mode)
 
 		if offset:
 			parsed_as.append("delta")
