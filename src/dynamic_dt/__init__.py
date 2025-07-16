@@ -64,6 +64,7 @@ def round_frac(x) -> number:
 
 def parse_num(s):
 	"Parses a number, may be negative or a non-integer."
+	s = s.replace(" ", "")
 	integer = s.split(".", 1)[0]
 	if len(integer) > 16:
 		return int(integer)
