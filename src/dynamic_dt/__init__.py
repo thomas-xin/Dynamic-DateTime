@@ -13,7 +13,7 @@ YEAR = 31556952
 ERA_YEARS = 400
 ERA = YEAR * ERA_YEARS
 
-num_re = re.compile(r"[+-]?([0-9]*\.)?[0-9]+")
+num_re = re.compile(r"[+-]?([0-9]*\.)?[0-9\s]+")
 ts_re = re.compile(r"<t:[+-]?[0-9]+[^0-9]")
 def is_number(s):
 	"More powerful version of s.isnumeric() that accepts negatives and floats."
@@ -521,70 +521,41 @@ class TemporaryDT:
 
 
 class DynamicDT(datetime.datetime):
-	"""
-	A flexible datetime class that extends the functionality of Python's built-in datetime.
-	The DynamicDT class provides extended datetime functionality including:
-	- Support for dates beyond the standard datetime range
-	- Fractional seconds with arbitrary precision
-	- BCE/CE date handling
-	- Natural language parsing
-	- Multiple string representation formats
-	- Discord timestamp compatibility
-	- Enhanced timezone support
+	"""A feature-rich `datetime.datetime` subclass that supports an extended year range,
+	high-precision fractional seconds, and robust natural language parsing.
+	This class overcomes the standard `datetime` year limitation (0-9999) by using an
+	internal year offset, allowing for the representation of dates in deep history
+	(BCE/BC) or the far future. It uses `fractions.Fraction` for sub-second
+	precision, avoiding floating-point inaccuracies and enabling calculations with
+	timescales smaller than a microsecond.
+	Key features include:
+	- A powerful `.parse()` class method that can interpret a wide variety of string
+		inputs, from standard ISO 8601 formats to natural language like "next Tuesday at 3pm"
+		or "3 weeks ago".
+	- A `.parse_delta()` class method for parsing time durations (e.g., "1y 2mo 3d").
+	- Full compatibility with standard `datetime` objects, `datetime.timedelta`, and
+		`dateutil.relativedelta`.
+	- Arithmetic operations (`+`, `-`) are overloaded to work with timedeltas,
+		relative deltas, and numeric seconds.
+	- Multiple output formatting methods, including ISO 8601 (`.as_iso()`), human-readable
+		strings (`.as_time()`, `.as_full()`), and Discord-compliant timestamps
+		(`.as_discord()`).
+	- High-precision Unix timestamp representation via `.timestamp_exact()` (returns a Fraction)
+		and `.timestamp_string()`.
 	Attributes:
-		parsed_as (list): Records the parsing methods used to create the datetime object
-		_dt (datetime): Internal datetime object
-		_offset (int): Year offset from standard datetime range
-		_ts (Fraction): Cached timestamp value
-		_fraction (Fraction): Fractional part of second
-		tzinfo (datetime.tzinfo): Timezone information
-	Class Methods:
-		utcfromtimestamp(ts): Create a UTC datetime from a timestamp
-		fromtimestamp(ts, tz=None): Create a datetime from a timestamp in given timezone
-		to_utc(self): Convert datetime to UTC
-		fromdatetime(dt, tz=None): Create from standard datetime object
-		utcnow(): Get current UTC datetime
-		now(tz=None): Get current datetime in given timezone
-		unix(): Get current Unix timestamp
-		parse_delta(s, return_remainder=False): Parse a time duration string
-		parse(s="", timestamp=None, timezone=None): Parse datetime from string
-	Instance Methods:
-		timestamp(): Get Unix timestamp as int or float
-		timestamp_exact(): Get exact Unix timestamp as Fraction
-		copy(): Create a deep copy
-		add_years(years=1): Add specified number of years
-		add_months(months=1): Add specified number of months
-		add(**kwargs): Add specified time units
-		replace(**kwargs): Replace datetime components
-		cast(tz=UTC): Convert to different timezone
-		as_year(): Format year string
-		as_date(): Format date string
-		as_time(): Format time string
-		as_full(): Format full natural language string
-		as_iso(): Format ISO-8601 string
-		as_discord(): Format Discord absolute timestamp
-		as_rel_discord(): Format Discord relative timestamp
-	Properties:
-		fraction: Get fractional part of second
-		offset: Get year offset
-		year: Get full year including offset
-	Magic Methods:
-		__add__, __radd__: Add time delta or number
-		__sub__: Subtract time delta, datetime or number
-		__eq__, __lt__, __le__, __gt__, __ge__: Compare datetimes
-		__str__: Convert to string using as_time()
-		__repr__: Detailed string representation
-		>>> dt = DynamicDT.parse("2024-01-01 12:00:00")
-		>>> dt.as_full()
-		'Monday 1 January 2024 at 12:00'
-		>>> dt = DynamicDT.parse("1000 BCE")
-		>>> dt.as_date()
-		'1000-01-01 BCE'
-		>>> dt = DynamicDT.parse("next monday at 3pm")
-		>>> dt.as_discord()
-		'<t:1234567890:F>'
+			year (int): The full year, which can be outside the 0-9999 range.
+			month (int): The month as a number from 1 to 12.
+			day (int): The day of the month as a number from 1 to 31.
+			hour (int): The hour as a number from 0 to 23.
+			minute (int): The minute as a number from 0 to 59.
+			second (int): The second as a number from 0 to 59.
+			microsecond (int): The microsecond, calculated from the `fraction`.
+			fraction (fractions.Fraction): The sub-second part of the timestamp.
+			tzinfo (datetime.tzinfo): The timezone object.
+			offset (int): The internal year offset used to extend the date range.
+			parsed_as (list[str]): A list of strings indicating which parsing methods
+					were successfully used to create the object via the `.parse()` method.
 	"""
-
 	__slots__ = ("__weakref__", "_dt", "_offset", "_ts", "_fraction", "parsed_as")
 
 	def __getstate__(self):
@@ -826,21 +797,6 @@ class DynamicDT(datetime.datetime):
 		return self
 
 	def replace(self, time=None, fraction=None, **kwargs):
-		"""
-		Replace specified components of the datetime object.
-
-		Parameters:
-		time (int, optional): Time in seconds since midnight to replace the time part of the datetime.
-		fraction (fractions.Fraction, optional): Fractional part of the second to replace.
-		**kwargs: Arbitrary keyword arguments corresponding to datetime components (e.g., year, month, day, hour, minute, second, microsecond, tzinfo).
-
-		Returns:
-		self: Updated instance of the datetime object with replaced components.
-
-		Raises:
-		ValueError: If any of the provided datetime components are out of their valid range.
-		AssertionError: If the provided time is not within the range [0, 86400).
-		"""
 		offs = None
 		if kwargs:
 			# Replace everything using standard datetime, except year (which is extended)
@@ -1044,28 +1000,6 @@ class DynamicDT(datetime.datetime):
 
 	@classmethod
 	def parse_delta(cls, s, return_remainder=False):
-		"""
-		Parse a time delta from a string representation.
-		Args:
-			s (str): The string representation of the time delta.
-			return_remainder (bool, optional): If True, return the remainder of the string that could not be parsed. Defaults to False.
-		Returns:
-			TimeDelta: The parsed time delta.
-			tuple: If return_remainder is True, returns a tuple containing the parsed time delta and the remainder of the string.
-		Raises:
-			ValueError: If the input string contains unrecognized tokens.
-		Examples:
-			>>> parse_delta("1y 2mo 3d")
-			TimeDelta(years=1, months=2, days=3)
-			>>> parse_delta("1y2mo3d4h30m57s")
-			TimeDelta(years=1, months=2, days=3, hours=4, minutes=30, seconds=57)
-			>>> parse_delta("1y 2mo 3d", return_remainder=True)
-			(TimeDelta(years=1, months=2, days=3), "")
-			>>> parse_delta("1y 2mo 3d and 4h", return_remainder=True)
-			(TimeDelta(years=1, months=2, days=3, hours=4), "")
-			>>> parse_delta("1y 2mo 3d before 4h", return_remainder=True)
-			(TimeDelta(years=-1, months=-2, days=-3, hours=4), "")
-		"""
 		if not isinstance(s, str):
 			s = str(s)
 		if s.startswith("in "):
@@ -1257,35 +1191,31 @@ class DynamicDT(datetime.datetime):
 
 	@classmethod
 	def parse(cls, s="", timestamp=None, timezone=None):
-		"""
-		Parses a given string to create a datetime object with various parsing modes.
+		"""Parses a string representation of a date and time into a DynamicDT object.
+		This versatile method can interpret a wide variety of formats, including:
+		- Absolute dates and times ("2023-10-27 10:00:00").
+		- Relative times ("next tuesday", "last month", "tomorrow").
+		- Time deltas ("in 2 hours", "5 days ago").
+		- Unix timestamps (integer or float).
+		- Discord timestamps ("<t:1672531200:F>").
+		- Special keywords ("now", "noon", "midnight").
+		- Lunar phases ("next full moon").
+		- Historical dates with eras ("1066 AD", "500 BCE").
+		The parser is designed to be flexible and understand natural language queries.
 		Args:
-			s (str): The string to parse. Defaults to an empty string.
-			timestamp (float, optional): A Unix timestamp to use as a reference point. Defaults to None.
-			timezone (str, optional): A timezone string to use for the datetime object. Defaults to None.
-		Returns:
-			datetime: A datetime object parsed from the input string.
+			s (str, optional): The string to parse. Defaults to "".
+			timestamp (float, optional): A Unix timestamp to use as the reference point
+				for relative parsing. If None, the current time is used. Defaults to None.
+			timezone (str | tzinfo, optional): The timezone to apply to the parsed date.
+				If a timezone is also found in the string `s`, the one from the string
+				takes precedence. If None, defaults to UTC.
 		Raises:
-			ValueError: If the mode is "unix" and the input string is not a valid Unix timestamp.
-		Parsing Modes:
-			- "now": Current datetime.
-			- "now+": Relative to current datetime.
-			- "noon": 12 PM.
-			- "midnight": 12 AM.
-			- "last", "previous", "next", "this", "today", "tomorrow", "yesterday", "unix": Relative datetime.
-			- "bce", "bc", "ad", "ce": Common era indicators.
-			- "in", "at": Timezone indicators.
-			- "natural_language": Natural language parsing.
-			- "year": Year parsing.
-			- "yyyymmdd": Date parsing in YYYYMMDD format.
-			- "unix_timestamp": Unix timestamp parsing.
-			- "value": General value parsing.
-			- "delta": Time delta parsing.
-			- "current": Current datetime.
-		Notes:
-			- The function handles various datetime formats and natural language inputs.
-			- It supports parsing of timezones and relative dates.
-			- The function can handle BCE/CE indicators and Unix timestamps.
+			ValueError: If the string `s` cannot be parsed into a valid date, time, or
+				timestamp, or if it contains ambiguous or unrecognised tokens.
+		Returns:
+			DynamicDT: A new DynamicDT object representing the parsed date and time.
+				The `parsed_as` attribute of the returned object contains a list of
+				strings indicating which parsing rules were successfully applied.
 		"""
 		if not isinstance(s, str):
 			s = str(s)

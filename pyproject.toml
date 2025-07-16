@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "Dynamic-DateTime"
-version = "0.1.8"
+version = "0.1.9"
 authors = [
   { name="thomas-xin", email="thomasxin@gmail.com" },
 ]
@@ -19,7 +19,7 @@ classifiers = [
 dependencies = [
   "python-dateutil>=2.9.0",
   "number-parser>=0.3.2",
-  "pytz>=2024.2",
+  "pytz>=2025.2",
 ]
 
 [project.urls]
