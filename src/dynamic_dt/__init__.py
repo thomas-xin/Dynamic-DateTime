@@ -379,6 +379,33 @@ class TimeDelta:
 	def to_dict(self):
 		return {k: getattr(self, k) for k in self.__slots__ if not k.startswith("_")}
 
+	def to_short(self):
+		self.normalise()
+		gy, y = divmod(abs(self.years), UNIT_GALACTIC_YEAR)
+		my, y = divmod(y, 1000000)
+		ky, y = divmod(y, 1000)
+		data = dict(
+			gy=gy,
+			my=my,
+			ky=ky,
+			y=y,
+			mo=self.months,
+			d=self.days,
+			h=self.hours,
+			m=self.minutes,
+			s=round_min(self.seconds + self.fraction),
+		)
+		out = []
+		if self < 0:
+			out.append("-")
+		for k, v in data.items():
+			if not v:
+				continue
+			out.append(f"{display_to_precision(abs(v), 1)}{k}")
+		if not out:
+			out.append("0s")
+		return "".join(map(str, out))
+
 	def negate(self):
 		for k in self.__slots__:
 			v = getattr(self, k)
@@ -420,6 +447,9 @@ class TimeDelta:
 			self.fraction += to_fraction(other.microseconds, 1e6)
 			self._total_seconds = None
 			return self
+		if isinstance(other, (int, float)):
+			self.seconds += other
+			return self
 		return NotImplemented
 
 	def __sub__(self, other):
@@ -432,6 +462,9 @@ class TimeDelta:
 			self.seconds -= other.seconds
 			self.fraction -= to_fraction(other.microseconds, 1e6)
 			self._total_seconds = None
+			return self
+		if isinstance(other, (int, float)):
+			self.seconds -= other
 			return self
 		return NotImplemented
 
@@ -1164,7 +1197,10 @@ class DynamicDT(datetime.datetime):
 			for j in range(k, i):
 				test = " ".join(tokens[j:i])
 				try:
-					num = parse_num_long(test)
+					if test in ("a", "an"):
+						num = 1
+					else:
+						num = parse_num_long(test)
 				except Exception:
 					pass
 				else:
@@ -1249,6 +1285,9 @@ class DynamicDT(datetime.datetime):
 							moon_mode = None
 							tokens.pop(i - 1)
 							i -= 1
+					if tokens[i - 1] == "the":
+						tokens.pop(i - 1)
+						i -= 1
 				if len(tokens) > i:
 					match tokens[i]:
 						case "after":
@@ -1274,11 +1313,17 @@ class DynamicDT(datetime.datetime):
 					tokens[i] = token.split(":", 1)[-1].replace(">", ":").split(":", 1)[0] + ".0"
 					parsed_as.append("discord_timestamp")
 		for m in ("last", "previous", "next", "this", "today", "tomorrow", "yesterday", "unix"):
-			if m in tokens:
-				tokens.remove(m)
-				mode = m
-				parsed_as.append("relative")
-				break
+			try:
+				i = tokens.index(m)
+			except ValueError:
+				continue
+			tokens.pop(i)
+			if i > 0 and m in ("last", "previous", "next") and tokens[i - 1] == "the":
+				tokens.pop(i - 1)
+				i -= 1
+			mode = m
+			parsed_as.append("relative")
+			break
 
 		direction = None
 		if "bce" in tokens:
