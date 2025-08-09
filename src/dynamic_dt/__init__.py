@@ -1127,6 +1127,11 @@ class DynamicDT(datetime.datetime):
 			token = tokens[i]
 			# Parse full abbreviations first (e.g. "1mo3d4h30m57s")
 			if abbrevs.fullmatch(token):
+				if token.startswith("-") and token[1:].count("-") == 0 and token[1:].count("+") == 0:
+					neg = True
+					token = token[1:]
+				else:
+					neg = False
 				tokens.pop(i)
 				num = 1
 				unit = None
@@ -1137,6 +1142,8 @@ class DynamicDT(datetime.datetime):
 						if search:
 							match, token = token[:search.start()], token[search.end():]
 							unit = abbreviations[match]
+							if neg:
+								num = -num
 							if unit in subsecond_values:
 								delta.fraction += to_fraction(num, subsecond_values[unit])
 							else:
@@ -1150,6 +1157,8 @@ class DynamicDT(datetime.datetime):
 						num = parse_num(match.group())
 						continue
 					assert unit
+					if neg:
+						num = -num
 					if unit in special_values:
 						unit, mult = special_values[unit]
 						num *= mult

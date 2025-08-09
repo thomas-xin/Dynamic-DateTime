@@ -33,6 +33,8 @@ import pytz
 repr(DynamicDT.parse_delta("1 year"))    # TimeDelta(1, 0, 0, 0, 0, 0, 0, None)
 DynamicDT.parse_delta("1 year").total_seconds()    # 31556925
 DynamicDT.parse_delta("9876543210 years, -1 attoseconds").to_string(precision=20)    # 43 galactic years 123 megaanna 541 millennia 210 years -1 day 23 hours 59 minutes 59.999999999999999999 seconds
+DynamicDT.parse_delta("1234567 seconds").negate().to_short()    # -14d6h56m7s
+DynamicDT.parse_delta("-14d6h56m7s +2mo")   # 2 months -15 days 17 hours 3 minutes 53 seconds
 repr(DynamicDT.parse("4 years after"))    # DynamicDT(2028, 12, 8, 6, 48, 14, fraction=Fraction(4312121, 10000000), tzinfo=get_timezone('UTC'))
 DynamicDT.parse("4 years after").as_iso()    # 2028-12-08T06:48:43.8579817Z
 DynamicDT.parse("4 years after").as_full()    # Thursday 8 December 2028 at 06:49
