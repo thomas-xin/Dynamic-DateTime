@@ -8,7 +8,7 @@ import time
 import dateutil
 import pytz
 
-number = int | float
+number = int | float | fractions.Fraction
 YEAR = 31556952
 ERA_YEARS = 400
 ERA = YEAR * ERA_YEARS
@@ -793,19 +793,29 @@ class DynamicDT(datetime.datetime):
 
 	def __eq__(self, other):
 		if not isinstance(other, self.__class__):
+			if isinstance(other, number):
+				return self.timestamp_exact() == other
 			return False
 		return self.year == other.year and self.timestamp() == other.timestamp()
 
 	def __lt__(self, other):
+		if isinstance(other, number):
+			return self.timestamp_exact() < other
 		return self.year < other.year or self.timestamp() < other.timestamp()
 	
 	def __le__(self, other):
+		if isinstance(other, number):
+			return self.timestamp_exact() <= other
 		return self.year < other.year or self.timestamp() <= other.timestamp()
 
 	def __gt__(self, other):
+		if isinstance(other, number):
+			return self.timestamp_exact() > other
 		return self.year > other.year or self.timestamp() > other.timestamp()
 	
 	def __ge__(self, other):
+		if isinstance(other, number):
+			return self.timestamp_exact() >= other
 		return self.year > other.year or self.timestamp() >= other.timestamp()
 
 	def add_years(self, years=1):
