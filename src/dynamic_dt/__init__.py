@@ -704,7 +704,10 @@ class DynamicDT(datetime.datetime):
 
 	@property
 	def fraction(self) -> fractions.Fraction | int:
-		return self.__getattribute__("_fraction", 0) or 0
+		try:
+			return self.__getattribute__("_fraction") or 0
+		except AttributeError:
+			return 0
 
 	def set_fraction(self, frac):
 		self._fraction = fractions.Fraction(frac).limit_denominator(1 << 192) if frac else 0
