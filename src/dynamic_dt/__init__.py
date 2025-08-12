@@ -684,7 +684,7 @@ class DynamicDT(datetime.datetime):
 		except (AttributeError, OSError):
 			ts = 0
 		ts2 = (offs + round_min(ts))
-		f = self._fraction
+		f = self.fraction
 		if ts2.is_integer() and not f:
 			return int(ts2)
 		return fractions.Fraction(ts2 + (f or 0))
