@@ -593,9 +593,11 @@ class DynamicDT(datetime.datetime):
 	__slots__ = ("__weakref__", "_dt", "_offset", "_ts", "_fraction", "parsed_as")
 
 	def __getstate__(self):
+		# Legacy state (kept for backward compatibility with existing pickles)
 		return "0.0.1", ((f := self.timestamp_exact()).numerator, f.denominator), get_name(self.tzinfo)
 
 	def __setstate__(self, s):
+		# Backward compatible legacy tuple formats
 		if len(s) == 3:
 			v, tsf, tzinfo = s
 			assert v == "0.0.1"
@@ -623,6 +625,9 @@ class DynamicDT(datetime.datetime):
 			self.set_offset(offs * ERA_YEARS)
 			return
 		raise TypeError("Unpickling failed:", s)
+
+	def __reduce_ex__(self, protocol):
+		return (self.__class__.fromtimestamp, (self.timestamp_exact(), self.tzinfo))
 
 	def copy(self):
 		return self.__class__.fromdatetime(self._dt).set_offset(self.offset)
