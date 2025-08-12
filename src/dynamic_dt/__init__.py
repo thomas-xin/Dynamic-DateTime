@@ -679,7 +679,10 @@ class DynamicDT(datetime.datetime):
 
 	def _timestamp_exact(self):
 		offs = self.offset * YEAR
-		ts = self._dt.timestamp()
+		try:
+			ts = self._dt.timestamp()
+		except (AttributeError, OSError):
+			ts = 0
 		ts2 = (offs + round_min(ts))
 		f = self._fraction
 		if ts2.is_integer() and not f:
