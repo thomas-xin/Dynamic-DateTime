@@ -735,7 +735,9 @@ class DynamicDT(datetime.datetime):
 			return self.__class__.fromdatetime(self._dt + other).set_offset(self.offset)
 		if not isinstance(other, datetime.timedelta):
 			return self.__class__.fromtimestamp(self.timestamp_exact() + fractions.Fraction(other), tz=self.tzinfo)
-		ts = self._dt.timestamp() + other.timestamp()
+		if hasattr(other, "total_seconds"):
+			other = other.total_seconds()
+		ts = self._dt.timestamp() + other
 		if abs(self.offset) >= 25600:
 			ts = round(ts)
 		return self.__class__.fromtimestamp(ts + self.offset * YEAR, tz=self.tzinfo)
