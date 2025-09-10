@@ -245,6 +245,9 @@ def get_timezone(tz) -> pytz.BaseTzInfo:
 	if isinstance(tz, number):
 		tzinfo = pytz._FixedOffset(tz * 60)
 		return tzinfo
+	if not isinstance(tz, str):
+		assert hasattr(tz, "tzname"), "Must be a number, string or compatible timezone."
+		return tz
 	otz, tz = tz, retrieve_tz(tz)
 	if tz:
 		return tz
@@ -273,7 +276,7 @@ def get_timezone(tz) -> pytz.BaseTzInfo:
 	else:
 		hours = math.trunc(hours)
 		hourdisp = f"{hours}:{round(offset - hours * 60)}"
-	tzinfo.canonical_name = get_name(tz) + "+-"[negative] + hourdisp
+	tzinfo.canonical_name = "UTC" + "+-"[negative] + hourdisp
 	return tzinfo
 
 def get_time(tz="utc"):
