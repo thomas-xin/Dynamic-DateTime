@@ -78,6 +78,15 @@ def parse_num_long(s):
 	import number_parser
 	s2 = number_parser.parse(s)
 	tokens = [w for w in s2.split() if w != "a"]
+	i = 0
+	while i < len(tokens) - 1:
+		left, right = tokens[i], tokens[i + 1]
+		llen, rlen = len(left.lstrip("-0")), len(right.lstrip("-0"))
+		if rlen - llen >= 2:
+			tokens[i + 1] = str(int(left) * int(right))
+			tokens.pop(i)
+			continue
+		i += 1
 	return int("".join(tokens))
 
 def strnum(num):
