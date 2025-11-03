@@ -1361,6 +1361,8 @@ class DynamicDT(datetime.datetime):
 				i = tokens.index(m)
 			except ValueError:
 				continue
+			if i == len(tokens) - 1 and m in ("last", "previous", "next", "this"):
+				continue
 			tokens.pop(i)
 			if i > 0 and m in ("last", "previous", "next") and tokens[i - 1] == "the":
 				tokens.pop(i - 1)
