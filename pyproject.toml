@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "Dynamic-DateTime"
-version = "0.1.24"
+version = "0.1.25"
 authors = [
   { name="thomas-xin", email="thomasxin@gmail.com" },
 ]
@@ -24,6 +24,7 @@ dependencies = [
 
 [project.urls]
 Homepage = "https://github.com/thomas-xin/Dynamic-DateTime"
+Repository = "https://github.com/thomas-xin/Dynamic-DateTime"
 Issues = "https://github.com/thomas-xin/Dynamic-DateTime/issues"
 
 [tool.hatch.build.targets.wheel]

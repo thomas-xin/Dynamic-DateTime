@@ -240,6 +240,8 @@ def get_offset(tzinfo, dt=None):
 def retrieve_tz(tz):
 	"Gets a timezone from a string, retrying with the last part of the string if the first attempt fails."
 	tz = tz.casefold()
+	if tz and (tz[0] == "(" and tz[-1] == ")" or tz[0] == "[" and tz[-1] == "]"):
+		tz = tz[1:-1]
 	try:
 		return TIMEZONES[tz]
 	except KeyError:
