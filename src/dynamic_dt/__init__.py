@@ -1,3 +1,4 @@
+import copy
 import datetime
 import fractions
 import functools
@@ -329,6 +330,7 @@ UNIT_GALACTIC_YEAR = 226814000
 UNIT_YEAR = 31556925
 UNIT_MONTH = fractions.Fraction(46751, 1536)
 
+
 @functools.total_ordering
 class TimeDelta:
 	"Custom timedelta class that can store both exact representations of years and months, as well as timestamp deltas in seconds. Where ambiguous, a galactic year is treated as exactly 226814000 years, a year is treated as exactly 31556925 seconds, and a month is treated as 46751/1536 (30.436848958[3]) days."
@@ -423,10 +425,14 @@ class TimeDelta:
 	def negate(self):
 		for k in self.__slots__:
 			v = getattr(self, k)
-			if v is not None:
+			if v:
 				setattr(self, k, -v)
 		return self
-	__neg__ = negate
+
+	def __neg__(self):
+		obj = copy.deepcopy(self)
+		obj.negate()
+		return obj
 
 	def is_negative(self):
 		return self.total_seconds() < 0
