@@ -767,7 +767,7 @@ class DynamicDT(datetime.datetime):
 		if not other:
 			return self
 		if isinstance(other, TimeDelta):
-			return self.copy().add(**other.negate().to_dict())
+			return self.copy().add(**(-other).to_dict())
 		if isinstance(other, dateutil.relativedelta.relativedelta):
 			return self.__class__.fromdatetime(self._dt + other).set_offset(self.offset)
 		if hasattr(other, "total_seconds"):
