@@ -656,7 +656,7 @@ class DynamicDT(datetime.datetime):
 		return self.__class__.fromdatetime(self._dt).set_offset(self.offset)
 
 	def __init__(self, *args, **kwargs):
-		self.parsed_as = None
+		self.parsed_as = []
 		tzinfo = kwargs.pop("tzinfo", None)
 		f = kwargs.pop("fraction", None)
 		if type(args[0]) is bytes:
@@ -1290,6 +1290,13 @@ class DynamicDT(datetime.datetime):
 		return delta
 
 	@classmethod
+	def parse_auto(cls, s="", timestamp=None, timezone=None) -> "DynamicDT | TimeDelta":
+		try:
+			return cls.parse_delta(s)
+		except ValueError:
+			return cls.parse(s, timestamp=timestamp, timezone=timezone)
+
+	@classmethod
 	def parse(cls, s="", timestamp=None, timezone=None) -> "DynamicDT":
 		"""Parses a string representation of a date and time into a DynamicDT object.
 		This versatile method can interpret a wide variety of formats, including:
@@ -1336,14 +1343,33 @@ class DynamicDT(datetime.datetime):
 			except ValueError:
 				k = len(tokens)
 			j = min(j, k)
-			main = tokens[:i] + tokens[j:]
-			dom = cls.parse(" ".join(main)) if main else cls.fromtimestamp(0, tz=timezone)
+			primary = " ".join(tokens[:i] + tokens[j:])
 			secondary = " ".join(tokens[i + 1:j])
-			try:
-				sub = cls.parse_delta(secondary)
-			except ValueError:
-				sub = cls.parse(secondary, timestamp=-62167219200).timestamp_exact() + 62167219200
-			return dom - sub
+			first = cls.parse_auto(primary, timestamp=timestamp, timezone=timezone)
+			second = cls.parse_auto(secondary, timestamp=timestamp, timezone=timezone)
+			if type(first) is cls:
+				parsed_as = first.parsed_as + ["difference"]
+				if type(second) is cls:
+					parsed_as.extend(second.parsed_as)
+					first2 = cls.parse("now", timestamp=timestamp, timezone=timezone)
+					out = first2 + (first - second)
+					out.parsed_as[:] = parsed_as
+					return out
+				parsed_as.append("delta")
+				out = first - second
+				out.parsed_as[:] = parsed_as
+				return out
+			first2 = cls.parse("now", timestamp=timestamp, timezone=timezone) + first
+			parsed_as = ["delta", "difference"]
+			if type(second) is cls:
+				parsed_as.extend(second.parsed_as)
+				out = first2 - second
+				out.parsed_as[:] = parsed_as
+				return out
+			parsed_as.append("delta")
+			out = first2 - second
+			out.parsed_as[:] = parsed_as
+			return out
 		try:
 			i = tokens.index("+")
 			if i == len(tokens) - 1:
@@ -1351,14 +1377,33 @@ class DynamicDT(datetime.datetime):
 		except ValueError:
 			pass
 		else:
-			main = " ".join(tokens[:i])
-			dom = cls.parse(main) if main else cls.fromtimestamp(0, tz=timezone)
+			primary = " ".join(tokens[:i])
 			secondary = " ".join(tokens[i + 1:])
-			try:
-				sub = cls.parse_delta(secondary)
-			except ValueError:
-				sub = cls.parse(secondary, timestamp=-62167219200).timestamp_exact() + 62167219200
-			return dom + sub
+			first = cls.parse_auto(primary, timestamp=timestamp, timezone=timezone)
+			second = cls.parse_auto(secondary, timestamp=timestamp, timezone=timezone)
+			if type(first) is cls:
+				parsed_as = first.parsed_as + ["sum"]
+				if type(second) is cls:
+					parsed_as.extend(second.parsed_as)
+					first2 = cls.parse("now", timestamp=timestamp, timezone=timezone)
+					out = first + (second - first2)
+					out.parsed_as[:] = parsed_as
+					return out
+				parsed_as.append("delta")
+				out = first + second
+				out.parsed_as[:] = parsed_as
+				return out
+			parsed_as = ["delta", "sum"]
+			if type(second) is cls:
+				parsed_as.extend(second.parsed_as)
+				out = first + second
+				out.parsed_as[:] = parsed_as
+				return out
+			first2 = cls.parse("now", timestamp=timestamp, timezone=timezone) + first
+			parsed_as.append("delta")
+			out = first2 + second
+			out.parsed_as[:] = parsed_as
+			return out
 		parsed_as = []
 
 		moon_phase = None
@@ -1636,5 +1681,5 @@ class DynamicDT(datetime.datetime):
 			self += offset
 		if direction == "bce":
 			self = self.replace(year=-self.year)
-		self.parsed_as = parsed_as
+		self.parsed_as[:] = parsed_as
 		return self
