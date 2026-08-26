@@ -31,6 +31,8 @@ def cast_str(s) -> str:
 
 def to_fraction(x, y):
 	"Converts two numbers to a fraction. Required as fractions.Fraction does not accept floats in the divisor."
+	x = round_min(x)
+	y = round_min(y)
 	if isinstance(x, int) and isinstance(y, int):
 		return fractions.Fraction(x, y)
 	if not isinstance(x, fractions.Fraction):
@@ -331,6 +333,79 @@ def display_to_precision(frac, precision=20) -> str:
 UNIT_GALACTIC_YEAR = 226814000
 UNIT_YEAR = 31556925
 UNIT_MONTH = fractions.Fraction(46751, 1536)
+
+timechecks = {
+	"galactic years": ("gy", "galactic year", "galactic years"),
+	"megaanna": ("my", "myr", "megaannum", "megaanna"),
+	"millennia": ("ml", "ky", "millennium", "millennia"),
+	"centuries": ("c", "century", "centuries"),
+	"decades": ("dc", "decade", "decades"),
+	"years": ("y", "yr", "year", "years"),
+	"months": ("mo", "mth", "mos", "mths", "month", "months"),
+	"fortnights": ("fortnight", "fortnights"),
+	"weeks": ("w", "wk", "week", "wks", "weeks"),
+	"days": ("d", "day", "days"),
+	"hours": ("h", "hr", "hour", "hrs", "hours"),
+	"minutes": ("m", "min", "minute", "mins", "minutes"),
+	"seconds": ("s", "sec", "second", "secs", "seconds"),
+	"milliseconds": ("ms", "milli", "millisecond", "millis", "milliseconds"),
+	"microseconds": ("μ", "us", "μs", "micro", "microsecond", "micros", "microseconds"),
+	"nanoseconds": ("ns", "nano", "nanosecond", "nanos", "nanoseconds"),
+	"picoseconds": ("ps", "pico", "picosecond", "picos", "picoseconds"),
+	"femtoseconds": ("fs", "femto", "femtosecond", "femtos", "femtoseconds"),
+	"attoseconds": ("as", "atto", "attosecond", "attos", "attoseconds"),
+	"zeptoseconds": ("zs", "zepto", "zeptosecond", "zeptos", "zeptoseconds"),
+	"yoctoseconds": ("ys", "yocto", "yoctosecond", "yoctos", "yoctoseconds"),
+	"rontoseconds": ("rs", "ronto", "rontosecond", "rontos", "rontoseconds"),
+	"quectoseconds": ("qs", "quecto", "quectosecond", "quectos", "quectoseconds"),
+	"plancks": ("planck", "plancks"),
+}
+special_values = {
+	"galactic years": ("years", UNIT_GALACTIC_YEAR),
+	"megaanna": ("years", 1000000),
+	"millennia": ("years", 1000),
+	"fortnights": ("days", 14),
+	"weeks": ("days", 7),
+}
+subsecond_values = dict(
+	milliseconds=1e3,
+	microseconds=1e6,
+	nanoseconds=1e9,
+	picoseconds=1e12,
+	femtoseconds=1e15,
+	attoseconds=1e18,
+	zeptoseconds=1e21,
+	yoctoseconds=10 ** 24,
+	rontoseconds=10 ** 27,
+	quectoseconds=10 ** 30,
+	plancks=539 * 10 ** 42,
+)
+timeunits = {u: k for k, v in timechecks.items() for u in v}
+abbreviations = {k: timeunits[k] for k in (
+	"gy",
+	"my", "myr",
+	"ml", "ky",
+	"c",
+	"dc",
+	"y", "yr",
+	"mo", "mth", "mos", "mths",
+	"w", "wk", "wks",
+	"d",
+	"h", "hr", "hrs",
+	"m", "min", "mins",
+	"s", "sec", "secs",
+	"ms",
+	"μ", "μs", "us",
+	"ns",
+	"ps",
+	"fs",
+	"as",
+	"zs",
+	"ys",
+	"rs",
+	"qs",
+)}
+abbrevs = re.compile(r"^(?:[+-]?([0-9]*[.])?[0-9]+(?:" + "|".join(abbreviations) + "))+$")
 
 
 @functools.total_ordering
@@ -663,9 +738,6 @@ class DynamicDT(datetime.datetime):
 		self.parsed_as = []
 		tzinfo = kwargs.pop("tzinfo", None)
 		f = kwargs.pop("fraction", None)
-		if type(args[0]) is bytes:
-			self._dt = datetime.datetime(args[0], tzinfo=tzinfo)
-			return
 		offs, y = divmod(args[0], ERA_YEARS)
 		y += 2000
 		offs *= ERA_YEARS
@@ -878,8 +950,7 @@ class DynamicDT(datetime.datetime):
 		ext, f = divmod(f, 1)
 		self = self.add_months(years * 12 + months)
 		self += secs + ext
-		self.set_fraction(f)
-		return self
+		return self.set_fraction(f)
 
 	def replace(self, time=None, fraction=None, **kwargs):
 		offs = None
@@ -921,8 +992,7 @@ class DynamicDT(datetime.datetime):
 		self = self.fromdatetime(dt)
 		if offs:
 			self = self.set_offset(offs)
-		self.set_fraction(fraction)
-		return self
+		return self.set_fraction(fraction)
 
 	def cast(self, tz=datetime.timezone.utc):
 		return self.fromtimestamp(self.timestamp_exact(), tz=tz)
@@ -1096,7 +1166,7 @@ class DynamicDT(datetime.datetime):
 	def parse_delta(cls, s: str, return_remainder: Literal[True]) -> tuple[TimeDelta, str]:
 		pass
 	@classmethod
-	def parse_delta(cls, s: str, return_remainder: bool = False):
+	def parse_delta(cls, s, return_remainder: bool = False):
 		if not isinstance(s, str):
 			s = str(s)
 		if s.startswith("in "):
@@ -1111,78 +1181,6 @@ class DynamicDT(datetime.datetime):
 				return td, ""
 			return td
 		tokens = s.strip().replace(",", " ").split()
-		timechecks = {
-			"galactic years": ("gy", "galactic year", "galactic years"),
-			"megaanna": ("my", "myr", "megaannum", "megaanna"),
-			"millennia": ("ml", "ky", "millennium", "millennia"),
-			"centuries": ("c", "century", "centuries"),
-			"decades": ("dc", "decade", "decades"),
-			"years": ("y", "yr", "year", "years"),
-			"months": ("mo", "mth", "mos", "mths", "month", "months"),
-			"fortnights": ("fortnight", "fortnights"),
-			"weeks": ("w", "wk", "week", "wks", "weeks"),
-			"days": ("d", "day", "days"),
-			"hours": ("h", "hr", "hour", "hrs", "hours"),
-			"minutes": ("m", "min", "minute", "mins", "minutes"),
-			"seconds": ("s", "sec", "second", "secs", "seconds"),
-			"milliseconds": ("ms", "milli", "millisecond", "millis", "milliseconds"),
-			"microseconds": ("μ", "us", "μs", "micro", "microsecond", "micros", "microseconds"),
-			"nanoseconds": ("ns", "nano", "nanosecond", "nanos", "nanoseconds"),
-			"picoseconds": ("ps", "pico", "picosecond", "picos", "picoseconds"),
-			"femtoseconds": ("fs", "femto", "femtosecond", "femtos", "femtoseconds"),
-			"attoseconds": ("as", "atto", "attosecond", "attos", "attoseconds"),
-			"zeptoseconds": ("zs", "zepto", "zeptosecond", "zeptos", "zeptoseconds"),
-			"yoctoseconds": ("ys", "yocto", "yoctosecond", "yoctos", "yoctoseconds"),
-			"rontoseconds": ("rs", "ronto", "rontosecond", "rontos", "rontoseconds"),
-			"quectoseconds": ("qs", "quecto", "quectosecond", "quectos", "quectoseconds"),
-			"plancks": ("planck", "plancks"),
-		}
-		special_values = {
-			"galactic years": ("years", UNIT_GALACTIC_YEAR),
-			"megaanna": ("years", 1000000),
-			"millennia": ("years", 1000),
-			"fortnights": ("days", 14),
-			"weeks": ("days", 7),
-		}
-		subsecond_values = dict(
-			milliseconds=1e3,
-			microseconds=1e6,
-			nanoseconds=1e9,
-			picoseconds=1e12,
-			femtoseconds=1e15,
-			attoseconds=1e18,
-			zeptoseconds=1e21,
-			yoctoseconds=10 ** 24,
-			rontoseconds=10 ** 27,
-			quectoseconds=10 ** 30,
-			plancks=539 * 10 ** 42,
-		)
-		timeunits = {u: k for k, v in timechecks.items() for u in v}
-		abbreviations = {k: timeunits[k] for k in (
-			"gy",
-			"my", "myr",
-			"ml", "ky",
-			"c",
-			"dc",
-			"y", "yr",
-			"mo", "mth", "mos", "mths",
-			"w", "wk", "wks",
-			"d",
-			"h", "hr", "hrs",
-			"m", "min", "mins",
-			"s", "sec", "secs",
-			"ms",
-			"μ", "μs", "us",
-			"ns",
-			"ps",
-			"fs",
-			"as",
-			"zs",
-			"ys",
-			"rs",
-			"qs",
-		)}
-		abbrevs = re.compile(r"^(?:[+-]?([0-9]*[.])?[0-9]+(?:" + "|".join(abbreviations) + "))+$")
 
 		delta = TimeDelta()
 		i = 0
@@ -1228,7 +1226,7 @@ class DynamicDT(datetime.datetime):
 					if unit in subsecond_values:
 						delta.fraction += to_fraction(num, subsecond_values[unit])
 					else:
-						setattr(delta, unit, num)
+						setattr(delta, unit, getattr(delta, unit, 0) + num)
 				if i < len(tokens) - 1:
 					match tokens[i]:
 						case "before" | "ago" | "to" | "until" | "till":
