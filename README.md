@@ -17,6 +17,7 @@ DynamicDT.parse("3 october 2016 in edt")    # 2016-10-03 00:00:00 EDT
 DynamicDT.parse("1961/01/29")    # 1961-01-29 00:00:00 UTC
 DynamicDT.parse("-123456789/05/11")    # 123456789-05-11 00:00:00 BCE UTC
 DynamicDT.parse("next thursday acdt")    # 2024-12-12 00:00:00 ACDT
+DynamicDT.parse("57 days since July 7th 2026")    # 2026-09-02 00:00:00 UTC
 DynamicDT.parse("2 hours before last december 22nd, utc-12")    # 2023-12-21 22:00:00 UTC-12
 DynamicDT.parse("one minute before two hours after sixty two years before three hundred and twelve thousand and seventy one nanoseconds before a million years after tomorrow")    # 1001962-12-09 01:58:59.999687929 UTC
 DynamicDT.parse("300-06-09 bce 6pm aqtt")    # 0300-06-09 18:00:00 BCE AQTT
@@ -36,6 +37,8 @@ DynamicDT.parse_delta("9876543210 years, -1 attoseconds").to_string(precision=20
 DynamicDT.parse_delta("1234567 seconds").negate().to_short()    # -14d6h56m7s
 DynamicDT.parse_delta("-14d6h56m7s +2mo")   # 2 months -15 days 17 hours 3 minutes 53 seconds
 repr(DynamicDT.parse("4 years after"))    # DynamicDT(2028, 12, 8, 6, 48, 14, fraction=Fraction(4312121, 10000000), tzinfo=get_timezone('UTC'))
+DynamicDT.parse("2025-06-14 + three months - 5h")    # 2025-09-13 19:00:00 UTC
+DynamicDT.parse("2025-06-14 + 2025-09-28")    # 4051-03-12 00:00:00 UTC; unintended case
 DynamicDT.parse("4 years after").as_iso()    # 2028-12-08T06:48:43.8579817Z
 DynamicDT.parse("4 years after").as_full()    # Thursday 8 December 2028 at 06:49
 DynamicDT.parse("4 years after").as_discord()    # <t:1859870945:F>

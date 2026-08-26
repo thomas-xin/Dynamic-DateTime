@@ -1,3 +1,4 @@
+from typing import overload
 import copy
 import datetime
 import fractions
@@ -10,6 +11,7 @@ import dateutil
 import pytz
 
 number = int | float | fractions.Fraction
+BASE_TIME = -62167219200 # Unix timestamp of year 0
 YEAR = 31556952
 ERA_YEARS = 400
 ERA = YEAR * ERA_YEARS
@@ -63,7 +65,7 @@ def round_frac(x) -> number:
 			return y
 	return x
 
-def parse_num(s):
+def parse_num(s) -> number:
 	"Parses a number, may be negative or a non-integer."
 	s = s.replace(" ", "")
 	integer = s.split(".", 1)[0]
@@ -72,7 +74,7 @@ def parse_num(s):
 	else:
 		return round_min(fractions.Fraction(s))
 
-def parse_num_long(s):
+def parse_num_long(s) -> number:
 	"Parses natural language as numbers."
 	if num_re.fullmatch(s):
 		return parse_num(s)
@@ -90,10 +92,10 @@ def parse_num_long(s):
 		i += 1
 	return int("".join(tokens))
 
-def strnum(num):
+def strnum(num) -> str:
 	return str(round_min(round(num, 6)))
 
-def time_disp(s, rounded=True):
+def time_disp(s, rounded=True) -> str:
 	"Returns a representation of a time interval using days:hours:minutes:seconds."
 	if not math.isfinite(s):
 		return str(s)
@@ -118,7 +120,7 @@ def time_disp(s, rounded=True):
 		output = "0:" + output
 	return output
 
-def time_parse(ts, default="s"):
+def time_parse(ts, default="s") -> number:
 	"Converts a time interval represented using days:hours:minutes:seconds, to a value in seconds."
 	if ts == "N/A":
 		return math.inf
@@ -147,7 +149,7 @@ lunar_phases = {k: fractions.Fraction(v) for k, v in dict(
 	waning_crescent=0.875,
 ).items()}
 lunar_phase_names = {k.replace("_", " "): v for k, v in lunar_phases.items()}
-def get_lunar_phase(dt):
+def get_lunar_phase(dt) -> float:
 	days = to_fraction(dt.timestamp_exact() - LUNATION_0, 86400)
 	lunations = days / fractions.Fraction("29.5305888531")
 	return lunations % 1
@@ -209,7 +211,7 @@ for line in timezone_abbreviations_table.splitlines():
 		tzinfo.canonical_name = name
 		TIMEZONES[abb] = tzinfo
 
-def get_name(tzinfo):
+def get_name(tzinfo) -> str:
 	"Gets the canonical name of a timezone where possible, returning UTC±X when ambiguous."
 	if tzinfo == datetime.timezone.utc:
 		return "UTC"
@@ -228,7 +230,7 @@ def get_name(tzinfo):
 			return "UTC" + "+-"[negative] + hourdisp
 	return tzinfo.__class__.__name__
 
-def get_offset(tzinfo, dt=None):
+def get_offset(tzinfo, dt=None) -> float:
 	"Gets the total offset of a timezone from UTC, in seconds."
 	if tzinfo == datetime.timezone.utc:
 		return 0
@@ -291,7 +293,7 @@ def get_timezone(tz) -> pytz.BaseTzInfo:
 	tzinfo.canonical_name = "UTC" + "+-"[negative] + hourdisp
 	return tzinfo
 
-def get_time(tz="utc"):
+def get_time(tz="utc") -> "DynamicDT":
 	"Gets the current time at a timezone specified by string."
 	return DynamicDT.now(tz=get_timezone(tz))
 
@@ -309,7 +311,7 @@ def month_days(year, month) -> int:
 		return 28
 	return 31
 
-def display_to_precision(frac, precision=20):
+def display_to_precision(frac, precision=20) -> str:
 	"Converts a fraction to a string with a specified precision."
 	if not frac:
 		return "0"
@@ -488,7 +490,7 @@ class TimeDelta:
 			return self
 		return NotImplemented
 
-	def normalise(self):
+	def normalise(self) -> "TimeDelta":
 		"""
 		Normalize the date and time components of the object.
 
@@ -568,6 +570,7 @@ class TemporaryDT:
 	def negate(self):
 		for k in self.set:
 			setattr(self, k, -getattr(self, k))
+		return self
 
 	def __add__(self, other):
 		self.deltas.append(other)
@@ -1075,8 +1078,16 @@ class DynamicDT(datetime.datetime):
 	def unix(cls):
 		return fractions.Fraction(time.time_ns(), 10 ** 9)
 
+	@overload
 	@classmethod
-	def parse_delta(cls, s, return_remainder=False):
+	def parse_delta(cls, s: str, return_remainder: bool = False) -> TimeDelta:
+		pass
+	@overload
+	@classmethod
+	def parse_delta(cls, s: str, return_remainder: bool = True) -> tuple[TimeDelta | str]:
+		pass
+	@classmethod
+	def parse_delta(cls, s: str, return_remainder: bool = False):
 		if not isinstance(s, str):
 			s = str(s)
 		if s.startswith("in "):
@@ -1214,7 +1225,7 @@ class DynamicDT(datetime.datetime):
 						case "before" | "ago" | "to" | "until" | "till":
 							delta.negate()
 							tokens.pop(i)
-						case "after" | "past" | "in" | "from":
+						case "after" | "since" | "past" | "in" | "from":
 							tokens.pop(i)
 						case "and":
 							tokens.pop(i)
@@ -1228,7 +1239,7 @@ class DynamicDT(datetime.datetime):
 				case "before" | "ago" | "to" | "until" | "till":
 					neg = True
 					i -= 1
-				case "after" | "past" | "in" | "from":
+				case "after" | "since" | "past" | "in" | "from":
 					neg = False
 					i -= 1
 				case "and":
@@ -1279,7 +1290,7 @@ class DynamicDT(datetime.datetime):
 		return delta
 
 	@classmethod
-	def parse(cls, s="", timestamp=None, timezone=None):
+	def parse(cls, s="", timestamp=None, timezone=None) -> "DynamicDT":
 		"""Parses a string representation of a date and time into a DynamicDT object.
 		This versatile method can interpret a wide variety of formats, including:
 		- Absolute dates and times ("2023-10-27 10:00:00").
@@ -1309,6 +1320,45 @@ class DynamicDT(datetime.datetime):
 		if not isinstance(s, str):
 			s = str(s)
 		tokens = s.casefold().strip().replace(",", " ").split()
+		try:
+			i = tokens.index("-")
+			if i == len(tokens) - 1:
+				raise ValueError(i)
+		except ValueError:
+			pass
+		else:
+			try:
+				j = tokens.index("-", i + 1)
+			except ValueError:
+				j = len(tokens)
+			try:
+				k = tokens.index("+", i + 1)
+			except ValueError:
+				k = len(tokens)
+			j = min(j, k)
+			main = tokens[:i] + tokens[j:]
+			dom = cls.parse(" ".join(main)) if main else cls.fromtimestamp(0, tz=timezone)
+			secondary = " ".join(tokens[i + 1:j])
+			try:
+				sub = cls.parse_delta(secondary)
+			except ValueError:
+				sub = cls.parse(secondary, timestamp=-62167219200).timestamp_exact() + 62167219200
+			return dom - sub
+		try:
+			i = tokens.index("+")
+			if i == len(tokens) - 1:
+				raise ValueError(i)
+		except ValueError:
+			pass
+		else:
+			main = " ".join(tokens[:i])
+			dom = cls.parse(main) if main else cls.fromtimestamp(0, tz=timezone)
+			secondary = " ".join(tokens[i + 1:])
+			try:
+				sub = cls.parse_delta(secondary)
+			except ValueError:
+				sub = cls.parse(secondary, timestamp=-62167219200).timestamp_exact() + 62167219200
+			return dom + sub
 		parsed_as = []
 
 		moon_phase = None
@@ -1471,7 +1521,7 @@ class DynamicDT(datetime.datetime):
 			raise ValueError(f"Expected a number representing unix timestamp in seconds, got {repr(s)}")
 
 		if s and self is None:
-			if timestamp:
+			if timestamp is not None:
 				self = cls.fromtimestamp(timestamp, tz=tzinfo)
 			else:
 				self = cls.now(tz=tzinfo)
@@ -1565,7 +1615,7 @@ class DynamicDT(datetime.datetime):
 					self += TimeDelta(days=-1)
 		elif self is None:
 			parsed_as.append("current")
-			if timestamp:
+			if timestamp is not None:
 				self = cls.fromtimestamp(timestamp, tz=tzinfo)
 			else:
 				self = cls.now(tz=tzinfo)
