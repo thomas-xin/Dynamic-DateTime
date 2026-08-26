@@ -1,4 +1,4 @@
-from typing import overload
+from typing import overload, Literal
 import copy
 import datetime
 import fractions
@@ -461,7 +461,9 @@ class TimeDelta:
 	def __add__(self, other):
 		if isinstance(other, self.__class__):
 			for k in self.__slots__:
-				setattr(self, k, getattr(self, k) + getattr(other, k))
+				d = getattr(other, k)
+				if d:
+					setattr(self, k, getattr(self, k) + d)
 			return self.normalise()
 		if isinstance(other, datetime.timedelta):
 			self.days += other.days
@@ -477,7 +479,9 @@ class TimeDelta:
 	def __sub__(self, other):
 		if isinstance(other, self.__class__):
 			for k in self.__slots__:
-				setattr(self, k, getattr(self, k) - getattr(other, k))
+				d = getattr(other, k)
+				if d:
+					setattr(self, k, getattr(self, k) - d)
 			return self.normalise()
 		if isinstance(other, datetime.timedelta):
 			self.days -= other.days
@@ -653,7 +657,7 @@ class DynamicDT(datetime.datetime):
 		return (self.__class__.fromtimestamp, (self.timestamp_exact(), self.tzinfo))
 
 	def copy(self):
-		return self.__class__.fromdatetime(self._dt).set_offset(self.offset)
+		return self.__class__.fromdatetime(self._dt).set_offset(self.offset).set_fraction(self.fraction)
 
 	def __init__(self, *args, **kwargs):
 		self.parsed_as = []
@@ -734,6 +738,7 @@ class DynamicDT(datetime.datetime):
 
 	def set_fraction(self, frac):
 		self._fraction = fractions.Fraction(frac).limit_denominator(1 << 192) if frac else 0
+		return self
 
 	@property
 	def offset(self) -> number:
@@ -753,7 +758,7 @@ class DynamicDT(datetime.datetime):
 		if not other:
 			return self
 		if isinstance(other, TimeDelta):
-			return self.copy().add(**other.to_dict())
+			return self.copy().add(**other.normalise().to_dict())
 		if isinstance(other, dateutil.relativedelta.relativedelta):
 			return self.__class__.fromdatetime(self._dt + other).set_offset(self.offset)
 		if not isinstance(other, datetime.timedelta):
@@ -1080,11 +1085,15 @@ class DynamicDT(datetime.datetime):
 
 	@overload
 	@classmethod
-	def parse_delta(cls, s: str, return_remainder: bool = False) -> TimeDelta:
+	def parse_delta(cls, s: str) -> TimeDelta:
 		pass
 	@overload
 	@classmethod
-	def parse_delta(cls, s: str, return_remainder: bool = True) -> tuple[TimeDelta | str]:
+	def parse_delta(cls, s: str, return_remainder: Literal[False]) -> TimeDelta:
+		pass
+	@overload
+	@classmethod
+	def parse_delta(cls, s: str, return_remainder: Literal[True]) -> tuple[TimeDelta, str]:
 		pass
 	@classmethod
 	def parse_delta(cls, s: str, return_remainder: bool = False):
