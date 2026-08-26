@@ -337,24 +337,38 @@ UNIT_MONTH = fractions.Fraction(46751, 1536)
 timechecks = {
 	"galactic years": ("gy", "galactic year", "galactic years"),
 	"megaanna": ("my", "myr", "megaannum", "megaanna"),
-	"millennia": ("ml", "ky", "millennium", "millennia"),
+	"millennia": ("ml", "ky", "kyr", "millennium", "millennia"),
 	"centuries": ("c", "century", "centuries"),
+	"indictions": ("indiction", "indictions"),
 	"decades": ("dc", "decade", "decades"),
+	"lustrums": ("lustrum", "lustrums"),
 	"years": ("y", "yr", "year", "years"),
+	"semesters": ("semester", "semesters"),
+	"trimesters": ("trimester", "trimesters"),
 	"months": ("mo", "mth", "mos", "mths", "month", "months"),
 	"fortnights": ("fortnight", "fortnights"),
 	"weeks": ("w", "wk", "week", "wks", "weeks"),
 	"days": ("d", "day", "days"),
 	"hours": ("h", "hr", "hour", "hrs", "hours"),
+	"kiloseconds": ("ks", "kilosecond", "kiloseconds"),
+	"hectoseconds": ("hs", "hectosecond", "hectoseconds"),
+	"moments": ("moments",),
 	"minutes": ("m", "min", "minute", "mins", "minutes"),
+	"decaseconds": ("decasecond", "decaseconds"),
 	"seconds": ("s", "sec", "second", "secs", "seconds"),
+	"deciseconds": ("ds", "deciseconds", "deciseconds"),
+	"centiseconds": ("cs", "centisecond", "centiseconds"),
 	"milliseconds": ("ms", "milli", "millisecond", "millis", "milliseconds"),
 	"microseconds": ("μ", "us", "μs", "micro", "microsecond", "micros", "microseconds"),
+	"shakes": ("shake", "shakes"),
 	"nanoseconds": ("ns", "nano", "nanosecond", "nanos", "nanoseconds"),
 	"picoseconds": ("ps", "pico", "picosecond", "picos", "picoseconds"),
+	"svedbergs": ("sv", "svedberg", "svedbergs"),
 	"femtoseconds": ("fs", "femto", "femtosecond", "femtos", "femtoseconds"),
+	"atomic": ("atomic", "atomics"),
 	"attoseconds": ("as", "atto", "attosecond", "attos", "attoseconds"),
 	"zeptoseconds": ("zs", "zepto", "zeptosecond", "zeptos", "zeptoseconds"),
+	"jiffies": ("jiffy", "jiffys", "jiffies"),
 	"yoctoseconds": ("ys", "yocto", "yoctosecond", "yoctos", "yoctoseconds"),
 	"rontoseconds": ("rs", "ronto", "rontosecond", "rontos", "rontoseconds"),
 	"quectoseconds": ("qs", "quecto", "quectosecond", "quectos", "quectoseconds"),
@@ -364,17 +378,33 @@ special_values = {
 	"galactic years": ("years", UNIT_GALACTIC_YEAR),
 	"megaanna": ("years", 1000000),
 	"millennia": ("years", 1000),
+	"centuries": ("years", 100),
+	"indictions": ("years", 15),
+	"decades": ("years", 10),
+	"lustrums": ("years", 5),
+	"semesters": ("months", 6),
+	"trimesters": ("months", 4),
 	"fortnights": ("days", 14),
 	"weeks": ("days", 7),
+	"kiloseconds": ("seconds", 1000),
+	"hectoseconds": ("seconds", 100),
+	"moments": ("seconds", 90),
+	"decaseconds": ("seconds", 10),
 }
 subsecond_values = dict(
+	deciseconds=1e1,
+	centiseconds=1e2,
 	milliseconds=1e3,
 	microseconds=1e6,
+	shakes=1e8,
 	nanoseconds=1e9,
 	picoseconds=1e12,
+	svedbergs=1e13,
 	femtoseconds=1e15,
+	atomic=fractions.Fraction(1, 10 ** 17) / fractions.Fraction("2.418884326586426"),
 	attoseconds=1e18,
 	zeptoseconds=1e21,
+	jiffies=fractions.Fraction(3, 10 ** 24),
 	yoctoseconds=10 ** 24,
 	rontoseconds=10 ** 27,
 	quectoseconds=10 ** 30,
@@ -1229,7 +1259,7 @@ class DynamicDT(datetime.datetime):
 						setattr(delta, unit, getattr(delta, unit, 0) + num)
 				if i < len(tokens) - 1:
 					match tokens[i]:
-						case "before" | "ago" | "to" | "until" | "till":
+						case "before" | "prior" | "ago" | "to" | "until" | "till":
 							delta.negate()
 							tokens.pop(i)
 						case "after" | "since" | "past" | "in" | "from":
@@ -1243,7 +1273,7 @@ class DynamicDT(datetime.datetime):
 		while i >= 0:
 			# Parse "before" and "after" keywords at the end of a timeframe
 			match tokens[i]:
-				case "before" | "ago" | "to" | "until" | "till":
+				case "before" | "prior" | "ago" | "to" | "until" | "till":
 					neg = True
 					i -= 1
 				case "after" | "since" | "past" | "in" | "from":
@@ -1440,7 +1470,7 @@ class DynamicDT(datetime.datetime):
 							moon_mode = None
 							tokens.pop(i - 1)
 							i -= 1
-					if tokens[i - 1] == "the":
+					if len(tokens) and i > 0 and tokens[i - 1] == "the":
 						tokens.pop(i - 1)
 						i -= 1
 				if len(tokens) > i:
@@ -1467,15 +1497,25 @@ class DynamicDT(datetime.datetime):
 				case _ if ts_re.match(token):
 					tokens[i] = token.split(":", 1)[-1].replace(">", ":").split(":", 1)[0] + ".0"
 					parsed_as.append("discord_timestamp")
-		for m in ("last", "previous", "next", "this", "today", "tomorrow", "yesterday", "unix"):
+		for m in ("last", "next", "this", "previous", "prior", "current", "coming", "today", "tomorrow", "yesterday", "unix"):
 			try:
 				i = tokens.index(m)
 			except ValueError:
 				continue
-			if i == len(tokens) - 1 and m in ("last", "previous", "next", "this"):
+			if i < len(tokens) - 1:
+				match m:
+					case "previous":
+						m = tokens[i] = "last"
+					case "prior":
+						m = tokens[i] = "last"
+					case "current":
+						m = tokens[i] = "this"
+					case "coming":
+						m = tokens[i] = "next"
+			elif m in ("last", "next", "this", "previous", "prior", "current", "coming"):
 				continue
 			tokens.pop(i)
-			if i > 0 and m in ("last", "previous", "next") and tokens[i - 1] == "the":
+			if i > 0 and m in ("last", "next") and tokens[i - 1] == "the":
 				tokens.pop(i - 1)
 				i -= 1
 			mode = m
@@ -1579,7 +1619,7 @@ class DynamicDT(datetime.datetime):
 			else:
 				self = cls.now(tz=tzinfo)
 			now = self.timestamp_exact()
-			self = self.replace(time=0)
+			# self = self.replace(time=0)
 			temp = TemporaryDT()
 			replacers = {}
 			# Parse special indicators such as "last monday", "this month", "next year" etc
@@ -1597,19 +1637,32 @@ class DynamicDT(datetime.datetime):
 					last_unit = tokens.pop(0)
 					if last_unit == "week":
 						temp = temp.replace(day=self.day)
+						unspec = False
 					else:
 						temp = temp.replace(**{last_unit: getattr(self, last_unit)})
+						unspec = True
 					last_unit += "s"
-					unspec = True
 				elif tokens[-1] in replaced_units:
 					last_unit = tokens.pop(-1)
 					if last_unit == "week":
 						temp = temp.replace(day=self.day)
+						unspec = False
 					else:
 						temp = temp.replace(**{last_unit: getattr(self, last_unit)})
+						unspec = True
 					last_unit += "s"
-					unspec = True
 				s = " ".join(tokens)
+				match s:
+					case "decade" | "century" | "millennium":
+						factor = 10 ** ("year", "decade", "century", "millennium").index(s)
+						year = self.year // factor * factor
+						match mode:
+							case "last":
+								year -= factor
+							case "next":
+								year += factor
+						temp = temp.replace(year=year)
+						s = ""
 			# Parse remaining strings, storing in our intercepted datetime
 			if s:
 				parsed_as.append("value")
@@ -1638,8 +1691,10 @@ class DynamicDT(datetime.datetime):
 						unspec = False
 				elif replacers:
 					replacers[unit] = 1 if unit in ("month", "day") else 0
-				else:
+				elif unspec:
 					last_unit = unit + "s"
+			if replacers:
+				replacers["fraction"] = 0
 			# Update necessary units
 			self = self.replace(**replacers)
 			# dateutil relativedelta automatically adds; correct this behaviour to stay relative when the "this" keyword is used
@@ -1652,17 +1707,17 @@ class DynamicDT(datetime.datetime):
 			match mode:
 				case "tomorrow" if last_unit == "days":
 					self += TimeDelta(days=1)
-				case "next" | "in" if last_unit and temp.deltas and self.timestamp_exact() < now:
+				case "next" | "in" if last_unit and temp.deltas:
 					self += TimeDelta(days=7)
-				case "next" | "in" if last_unit == "weeks" and self.timestamp_exact() < now:
+				case "next" | "in" if last_unit == "weeks":
 					self += TimeDelta(days=7)
-				case "next" | "in" if last_unit and self.timestamp_exact() < now:
+				case "next" | "in" if last_unit:
 					self += TimeDelta(**{last_unit: 1})
-				case "last" | "from" if last_unit and temp.deltas and self.timestamp_exact() > now:
+				case "last" | "from" if last_unit and temp.deltas:
 					self += TimeDelta(days=-7)
-				case "last" | "from" if last_unit == "weeks" and self.timestamp_exact() > now:
+				case "last" | "from" if last_unit == "weeks":
 					self += TimeDelta(days=-7)
-				case "last" | "from" if last_unit and self.timestamp_exact() > now:
+				case "last" | "from" if last_unit:
 					self += TimeDelta(**{last_unit: -1})
 				case "yesterday" if last_unit == "days":
 					self += TimeDelta(days=-1)
